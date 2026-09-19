@@ -1,26 +1,10 @@
-import React, {
-  useEffect,
-  useRef,
-  useState
-} from 'react';
-
+import React, { useEffect, useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
-
-import {
-  BrowserRouter,
-  NavLink,
-  Navigate,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate
-} from 'react-router-dom';
-
+import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-
 import {
   BarChart3,
   Bell,
@@ -49,9 +33,31 @@ import {
   PackageSearch,
   ShoppingBag,
   ChevronRight,
-  ArrowLeft
+  ArrowLeft,
+  ShieldCheck,
+  CreditCard,
+  Building2,
+  Eye,
+  EyeOff,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  Search,
+  Filter,
+  RefreshCw,
+  ExternalLink,
+  Layers,
+  Activity,
+  Award,
+  Lock,
+  Download,
+  Check,
+  Copy,
+  Clock,
+  Sliders,
+  DollarSign,
+  PieChart
 } from 'lucide-react';
-
 import {
   Bar,
   BarChart,
@@ -66,2798 +72,110 @@ import {
   YAxis,
   Cell
 } from 'recharts';
-
 import './styles.css';
 
+/* =========================================================
+   API CONFIGURATION
+   ========================================================= */
+const API = import.meta.env.VITE_API_URL || 'http://localhost:4100/api';
 
 /* =========================================================
-   API
+   FORMATTERS & HELPERS
    ========================================================= */
-
-const API =
-  import.meta.env.VITE_API_URL ||
-  'http://localhost:4100/api';
-
-
-/* =========================================================
-   FORMAT
-   ========================================================= */
-
 const money = (n) =>
-  new Intl.NumberFormat(
-    'id-ID',
-    {
-      style: 'currency',
-      currency: 'IDR',
-      maximumFractionDigits: 0
-    }
-  ).format(
-    Number(n || 0)
-  );
-
+  new Intl.NumberFormat('id-ID', {
+    style: 'currency',
+    currency: 'IDR',
+    maximumFractionDigits: 0
+  }).format(Number(n || 0));
 
 const shortMoney = (n) => {
-  const v =
-    Number(n || 0);
-
-  if (
-    Math.abs(v) >=
-    1_000_000
-  ) {
+  const v = Number(n || 0);
+  if (Math.abs(v) >= 1_000_000_000) {
+    return `Rp ${(v / 1_000_000_000).toFixed(2)} M`;
+  }
+  if (Math.abs(v) >= 1_000_000) {
     return `Rp ${(v / 1_000_000).toFixed(1)} jt`;
   }
-
-  if (
-    Math.abs(v) >=
-    1_000
-  ) {
+  if (Math.abs(v) >= 1_000) {
     return `Rp ${(v / 1_000).toFixed(0)} rb`;
   }
-
   return money(v);
 };
 
-
 const dateLabel = (iso) =>
-  new Date(iso)
-    .toLocaleDateString(
-      'id-ID',
-      {
-        day: '2-digit',
-        month: 'short'
-      }
-    );
-
-
-/* =========================================================
-   AXIOS
-   ========================================================= */
-
-const api =
-  axios.create({
-    baseURL: API
+  new Date(iso).toLocaleDateString('id-ID', {
+    day: '2-digit',
+    month: 'short'
   });
 
-
-api.interceptors.request.use(
-  (config) => {
-
-    const token =
-      localStorage.getItem(
-        'p2_token'
-      );
-
-    if (token) {
-      config.headers.Authorization =
-        `Bearer ${token}`;
-    }
-
-    return config;
-  }
-);
-
+const formatDateTime = (iso) => {
+  if (!iso) return '-';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '-';
+  return d.toLocaleString('id-ID', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
 
 /* =========================================================
-   APP
+   AXIOS INSTANCE & INTERCEPTORS
    ========================================================= */
+const api = axios.create({
+  baseURL: API
+});
 
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('p2_token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+/* =========================================================
+   MAIN APP ROUTER
+   ========================================================= */
 function App() {
-
   return (
     <BrowserRouter>
       <Routes>
-
-        <Route
-          path="/login"
-          element={<Login />}
-        />
-
-        <Route
-          path="*"
-          element={<ProtectedLayout />}
-        />
-
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<ProtectedLayout />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
-// ========================================================
-// Settings Page
-// ======================================================== */
-
-function SettingsPage() {
-
-  const [
-    activeSection,
-    setActiveSection
-  ] = useState(null);
-
-
-  const [
-    settings,
-    setSettings
-  ] = useState({
-
-    businessName:
-      'Dapoersari',
-
-    businessDescription:
-      '',
-
-    phone:
-      '',
-
-    address:
-      '',
-
-    openingHours:
-      '',
-
-    shopeefoodPlatformRate:
-      25,
-
-    targetDailySales:
-      0,
-
-    targetMonthlySales:
-      0,
-
-    targetDailyTransactions:
-      0,
-
-    targetMargin:
-      0
-
-  });
-
-
-  const [
-    categories,
-    setCategories
-  ] = useState([]);
-
-
-  const [
-    loading,
-    setLoading
-  ] = useState(true);
-
-
-  const [
-    saving,
-    setSaving
-  ] = useState(false);
-
-
-  const [
-    categoryLoading,
-    setCategoryLoading
-  ] = useState(false);
-
-
-  const [
-    categoryModal,
-    setCategoryModal
-  ] = useState(false);
-
-
-  const [
-    categoryForm,
-    setCategoryForm
-  ] = useState({
-
-    id: null,
-
-    name:
-      ''
-
-  });
-
-
-  const [
-    message,
-    setMessage
-  ] = useState('');
-
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
-
-  const [
-  passwordModal,
-  setPasswordModal
-] = useState(false);
-
-
-const [
-  passwordForm,
-  setPasswordForm
-] = useState({
-
-  currentPassword:
-    '',
-
-  newPassword:
-    '',
-
-  confirmPassword:
-    ''
-
-});
-
-
-const [
-  passwordSaving,
-  setPasswordSaving
-] = useState(false);
-
-
-const [
-  passwordError,
-  setPasswordError
-] = useState('');
-
-
-/* =====================================================
-ubah password
-===================================================== */
-const changePassword =
-  async (event) => {
-
-    event.preventDefault();
-
-
-    setPasswordError('');
-
-
-    if (
-      passwordForm.currentPassword
-        .length === 0
-    ) {
-
-      setPasswordError(
-        'Password saat ini wajib diisi.'
-      );
-
-      return;
-
-    }
-
-
-    if (
-      passwordForm.newPassword
-        .length < 6
-    ) {
-
-      setPasswordError(
-        'Password baru minimal 6 karakter.'
-      );
-
-      return;
-
-    }
-
-
-    if (
-      passwordForm.newPassword !==
-      passwordForm.confirmPassword
-    ) {
-
-      setPasswordError(
-        'Konfirmasi password tidak cocok.'
-      );
-
-      return;
-
-    }
-
-
-    if (
-      passwordForm.currentPassword ===
-      passwordForm.newPassword
-    ) {
-
-      setPasswordError(
-        'Password baru harus berbeda dari password lama.'
-      );
-
-      return;
-
-    }
-
-
-    try {
-
-      setPasswordSaving(
-        true
-      );
-
-
-      await api.post(
-        '/auth/change-password',
-        {
-
-          currentPassword:
-            passwordForm.currentPassword,
-
-          newPassword:
-            passwordForm.newPassword
-
-        }
-      );
-
-
-      setPasswordModal(
-        false
-      );
-
-
-      setPasswordForm({
-
-        currentPassword:
-          '',
-
-        newPassword:
-          '',
-
-        confirmPassword:
-          ''
-
-      });
-
-
-      alert(
-        'Password berhasil diubah.'
-      );
-
-
-    } catch (error) {
-
-      console.error(
-        'Gagal mengubah password:',
-        error
-      );
-
-
-      setPasswordError(
-        error?.response?.data?.error ||
-        'Password gagal diubah.'
-      );
-
-
-    } finally {
-
-      setPasswordSaving(
-        false
-      );
-
-    }
-
-  };
-
-
-
-  /* =====================================================
-     LOAD SETTINGS
-  ===================================================== */
-
-  const loadSettings =
-    async () => {
-
-      try {
-
-        setLoading(true);
-
-        setError('');
-
-        const response =
-          await api.get(
-            '/settings'
-          );
-
-
-        const data =
-          response.data ||
-          {};
-
-
-        setSettings({
-
-          businessName:
-            data.businessName ||
-            data.business_name ||
-            'Dapoersari',
-
-          businessDescription:
-            data.businessDescription ||
-            data.business_description ||
-            '',
-
-          phone:
-            data.phone ||
-            '',
-
-          address:
-            data.address ||
-            '',
-
-          openingHours:
-            data.openingHours ||
-            data.opening_hours ||
-            '',
-
-          shopeefoodPlatformRate:
-            Number(
-              data.shopeefoodPlatformRate ??
-              data.platformFee ??
-              data.shopeefood_platform_rate ??
-              25
-            ),
-
-          targetDailySales:
-            Number(
-              data.targetDailySales ??
-              data.dailyTarget ??
-              data.target_daily_sales ??
-              0
-            ),
-
-          targetMonthlySales:
-            Number(
-              data.targetMonthlySales ??
-              data.monthlyTarget ??
-              data.target_monthly_sales ??
-              0
-            ),
-
-          targetDailyTransactions:
-            Number(
-              data.targetDailyTransactions ??
-              data.target_daily_transactions ??
-              0
-            ),
-
-          targetMargin:
-            Number(
-              data.targetMargin ??
-              data.target_margin ??
-              0
-            )
-
-        });
-
-
-      } catch (e) {
-
-        console.error(
-          'Gagal memuat pengaturan:',
-          e
-        );
-
-
-        setError(
-          e?.response?.data?.error ||
-          ''
-        );
-
-      } finally {
-
-        setLoading(false);
-
-      }
-
-    };
-
-
-  /* =====================================================
-     LOAD CATEGORIES
-  ===================================================== */
-
-  const loadCategories =
-    async () => {
-
-      try {
-
-        setCategoryLoading(
-          true
-        );
-
-
-        const response =
-          await api.get(
-            '/expense-categories'
-          );
-
-
-        const data =
-          Array.isArray(
-            response.data
-          )
-            ? response.data
-            : Array.isArray(
-                response.data?.data
-              )
-              ? response.data.data
-              : [];
-
-
-        setCategories(
-          data
-        );
-
-
-      } catch (e) {
-
-        console.error(
-          'Kategori gagal dimuat:',
-          e
-        );
-
-        setCategories([]);
-
-      } finally {
-
-        setCategoryLoading(
-          false
-        );
-
-      }
-
-    };
-
-
-  useEffect(() => {
-
-    loadSettings();
-
-    loadCategories();
-
-  }, []);
-
-
-  /* =====================================================
-     UPDATE
-  ===================================================== */
-
-  const updateField =
-    (
-      field,
-      value
-    ) => {
-
-      setSettings(
-        current => ({
-          ...current,
-          [field]:
-            value
-        })
-      );
-
-
-      setMessage('');
-
-    };
-
-
-  /* =====================================================
-     SAVE
-  ===================================================== */
-
-  const saveSettings =
-    async (event) => {
-
-      event.preventDefault();
-
-
-      try {
-
-        setSaving(true);
-
-        setMessage('');
-
-        setError('');
-
-
-        await api.put(
-          '/settings',
-          {
-
-            businessName:
-              settings.businessName,
-
-            shopeefoodPlatformRate:
-              Number(
-                settings.shopeefoodPlatformRate
-              ),
-
-            targetDailySales:
-              Number(
-                settings.targetDailySales
-              ),
-
-            targetMonthlySales:
-              Number(
-                settings.targetMonthlySales
-              )
-
-          }
-        );
-
-
-        setMessage(
-          'Pengaturan berhasil disimpan.'
-        );
-
-
-      } catch (e) {
-
-        console.error(
-          'Gagal menyimpan:',
-          e
-        );
-
-
-        setError(
-          e?.response?.data?.error ||
-          'Pengaturan gagal disimpan.'
-        );
-
-      } finally {
-
-        setSaving(false);
-
-      }
-
-    };
-
-
-  /* =====================================================
-     CATEGORY
-  ===================================================== */
-
-  const openAddCategory =
-    () => {
-
-      setCategoryForm({
-        id:
-          null,
-
-        name:
-          ''
-      });
-
-      setCategoryModal(
-        true
-      );
-
-    };
-
-
-  const openEditCategory =
-    category => {
-
-      setCategoryForm({
-
-        id:
-          category.id,
-
-        name:
-          category.name || ''
-
-      });
-
-      setCategoryModal(
-        true
-      );
-
-    };
-
-
-  const saveCategory =
-    async event => {
-
-      event.preventDefault();
-
-
-      const name =
-        categoryForm.name.trim();
-
-
-      if (!name) {
-
-        alert(
-          'Nama kategori wajib diisi.'
-        );
-
-        return;
-
-      }
-
-
-      try {
-
-        setCategoryLoading(
-          true
-        );
-
-
-        if (
-          categoryForm.id
-        ) {
-
-          await api.put(
-            `/expense-categories/${categoryForm.id}`,
-            { name }
-          );
-
-        } else {
-
-          await api.post(
-            '/expense-categories',
-            { name }
-          );
-
-        }
-
-
-        setCategoryModal(
-          false
-        );
-
-
-        await loadCategories();
-
-      } catch (e) {
-
-        alert(
-          e?.response?.data?.error ||
-          'Kategori gagal disimpan.'
-        );
-
-      } finally {
-
-        setCategoryLoading(
-          false
-        );
-
-      }
-
-    };
-
-
-  const deleteCategory =
-    async id => {
-
-      const confirmed =
-        window.confirm(
-          'Hapus kategori ini?'
-        );
-
-
-      if (!confirmed) {
-        return;
-      }
-
-
-      try {
-
-        await api.delete(
-          `/expense-categories/${id}`
-        );
-
-
-        await loadCategories();
-
-      } catch (e) {
-
-        alert(
-          e?.response?.data?.error ||
-          'Kategori gagal dihapus.'
-        );
-
-      }
-
-    };
-
-
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
-  if (loading) {
-
-    return (
-      <LoadingPage />
-    );
-
-  }
-
-
-  /* =====================================================
-     MENU CONFIG
-  ===================================================== */
-
-  const settingMenus = [
-
-    {
-      id:
-        'usaha',
-
-      title:
-        'Profil Usaha',
-
-      description:
-        'Identitas, kontak, alamat, dan jam operasional usaha.',
-
-      icon:
-        <Store size={19} />
-
-    },
-
-    {
-      id:
-        'penjualan',
-
-      title:
-        'Penjualan',
-
-      description:
-        'Atur channel penjualan dan parameter potongan platform.',
-
-      icon:
-        <Receipt size={19} />
-
-    },
-
-    {
-      id:
-        'target',
-
-      title:
-        'Target Bisnis',
-
-      description:
-        'Tentukan target omzet dan indikator performa usaha.',
-
-      icon:
-        <Target size={19} />
-
-    },
-
-    {
-      id:
-        'kategori',
-
-      title:
-        'Kategori Pengeluaran',
-
-      description:
-        'Kelola kategori biaya agar pencatatan lebih terstruktur.',
-
-      icon:
-        <WalletCards size={19} />
-
-    },
-
-    {
-      id:
-        'akun',
-
-      title:
-        'Akun & Keamanan',
-
-      description:
-        'Kelola profil owner dan keamanan akun.',
-
-      icon:
-        <Settings size={19} />
-
-    }
-
-  ];
-
-
-  /* =====================================================
-     PAGE HEADER
-  ===================================================== */
-
-  return (
-    <>
-
-      <PageHeader
-
-        eyebrow="
-          PUSAT PENGATURAN
-        "
-
-        title="
-          Pengaturan
-        "
-
-        subtitle="
-          Kelola konfigurasi usaha,
-          penjualan, target bisnis,
-          dan akun owner.
-        "
-
-      />
-
-
-      <div
-        className="
-          settings-shell
-        "
-      >
-
-
-        {/* =================================================
-            MENU AWAL
-        ================================================= */}
-
-        {!activeSection && (
-
-          <section
-            className="
-              settings-home
-            "
-          >
-
-            <div
-              className="
-                settings-home-intro
-              "
-            >
-
-           </div>
-
-
-            <div
-              className="
-                settings-menu-list
-              "
-            >
-
-              {settingMenus.map(
-                item => (
-
-                  <button
-
-                    key={
-                      item.id
-                    }
-
-                    type="button"
-
-                    className="
-                      settings-menu-card
-                    "
-
-                    onClick={() =>
-                      setActiveSection(
-                        item.id
-                      )
-                    }
-
-                  >
-
-                    <div
-                      className="
-                        settings-menu-icon
-                      "
-                    >
-
-                      {
-                        item.icon
-                      }
-
-                    </div>
-
-
-                    <div
-                      className="
-                        settings-menu-copy
-                      "
-                    >
-
-                      <strong>
-                        {
-                          item.title
-                        }
-                      </strong>
-
-                      <span>
-                        {
-                          item.description
-                        }
-                      </span>
-
-                    </div>
-
-
-                    <ChevronRight
-                      size={18}
-                      className="
-                        settings-menu-arrow
-                      "
-                    />
-
-                  </button>
-
-                )
-              )}
-
-            </div>
-
-          </section>
-
-        )}
-
-
-        {/* =================================================
-            DETAIL
-        ================================================= */}
-
-        {activeSection && (
-
-          <section
-            className="
-              settings-detail
-            "
-          >
-
-            <button
-
-              type="button"
-
-              className="
-                settings-back
-              "
-
-              onClick={() =>
-                setActiveSection(
-                  null
-                )
-              }
-
-            >
-
-              <ArrowLeft
-                size={16}
-              />
-
-              Kembali ke Pengaturan
-
-            </button>
-
-
-            {/* =================================================
-                PROFIL USAHA
-            ================================================= */}
-
-            {activeSection ===
-              'usaha' && (
-
-              <form
-                className="
-                  settings-detail-card
-                "
-
-                onSubmit={
-                  saveSettings
-                }
-              >
-
-                <div
-                  className="
-                    settings-detail-head
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-detail-icon
-                    "
-                  >
-                    <Store
-                      size={19}
-                    />
-                  </div>
-
-                  <div>
-
-                    <span>
-                      PROFIL USAHA
-                    </span>
-
-                    <h2>
-                      Profil Usaha
-                    </h2>
-
-                    <p>
-                      Identitas yang digunakan
-                      dalam sistem.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-form
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Nama Usaha
-                    </label>
-
-                    <input
-                      value={
-                        settings.businessName
-                      }
-                      onChange={e =>
-                        updateField(
-                          'businessName',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Nomor Telepon
-                    </label>
-
-                    <input
-                      value={
-                        settings.phone
-                      }
-                      onChange={e =>
-                        updateField(
-                          'phone',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                      settings-field-full
-                    "
-                  >
-
-                    <label>
-                      Deskripsi Usaha
-                    </label>
-
-                    <textarea
-                      value={
-                        settings.businessDescription
-                      }
-                      onChange={e =>
-                        updateField(
-                          'businessDescription',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                      settings-field-full
-                    "
-                  >
-
-                    <label>
-                      Alamat Usaha
-                    </label>
-
-                    <textarea
-                      value={
-                        settings.address
-                      }
-                      onChange={e =>
-                        updateField(
-                          'address',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Jam Operasional
-                    </label>
-
-                    <input
-                      value={
-                        settings.openingHours
-                      }
-                      onChange={e =>
-                        updateField(
-                          'openingHours',
-                          e.target.value
-                        )
-                      }
-                      placeholder="
-                        10.00 - 22.00
-                      "
-                    />
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-card-foot
-                  "
-                >
-
-                  <div>
-
-                    {message && (
-                      <span
-                        className="
-                          settings-success
-                        "
-                      >
-                        {message}
-                      </span>
-                    )}
-
-                    {error && (
-                      <span
-                        className="
-                          settings-error
-                        "
-                      >
-                        {error}
-                      </span>
-                    )}
-
-                  </div>
-
-
-                  <button
-                    type="submit"
-                    className="
-                      primary-btn
-                    "
-                    disabled={
-                      saving
-                    }
-                  >
-
-                    {saving
-                      ? 'Menyimpan...'
-                      : 'Simpan Perubahan'
-                    }
-
-                  </button>
-
-                </div>
-
-              </form>
-
-            )}
-
-
-            {/* =================================================
-                PENJUALAN
-            ================================================= */}
-
-            {activeSection ===
-              'penjualan' && (
-
-              <form
-                className="
-                  settings-detail-card
-                "
-                onSubmit={
-                  saveSettings
-                }
-              >
-
-                <div
-                  className="
-                    settings-detail-head
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-detail-icon
-                    "
-                  >
-                    <Receipt
-                      size={19}
-                    />
-                  </div>
-
-                  <div>
-
-                    <span>
-                      PENJUALAN
-                    </span>
-
-                    <h2>
-                      Konfigurasi Penjualan
-                    </h2>
-
-                    <p>
-                      Pengaturan yang digunakan
-                      untuk perhitungan penjualan.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-form
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Potongan ShopeeFood (%)
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={
-                        settings.shopeefoodPlatformRate
-                      }
-                      onChange={e =>
-                        updateField(
-                          'shopeefoodPlatformRate',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                    <small
-                      className="
-                        settings-help
-                      "
-                    >
-                      Digunakan untuk menghitung
-                      penjualan bersih.
-                    </small>
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Channel Penjualan
-                    </label>
-
-                    <div
-                      className="
-                        settings-static-box
-                      "
-                    >
-
-                      <span>
-                        Website
-                      </span>
-
-                      <b>
-                        Aktif
-                      </b>
-
-                    </div>
-
-
-                    <div
-                      className="
-                        settings-static-box
-                      "
-                    >
-
-                      <span>
-                        Offline
-                      </span>
-
-                      <b>
-                        Aktif
-                      </b>
-
-                    </div>
-
-
-                    <div
-                      className="
-                        settings-static-box
-                      "
-                    >
-
-                      <span>
-                        ShopeeFood
-                      </span>
-
-                      <b>
-                        Aktif
-                      </b>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-card-foot
-                  "
-                >
-
-                  <div />
-
-                  <button
-                    type="submit"
-                    className="
-                      primary-btn
-                    "
-                    disabled={
-                      saving
-                    }
-                  >
-
-                    {saving
-                      ? 'Menyimpan...'
-                      : 'Simpan Konfigurasi'
-                    }
-
-                  </button>
-
-                </div>
-
-              </form>
-
-            )}
-
-
-            {/* =================================================
-                TARGET
-            ================================================= */}
-
-            {activeSection ===
-              'target' && (
-
-              <form
-                className="
-                  settings-detail-card
-                "
-                onSubmit={
-                  saveSettings
-                }
-              >
-
-                <div
-                  className="
-                    settings-detail-head
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-detail-icon
-                    "
-                  >
-                    <Target
-                      size={19}
-                    />
-                  </div>
-
-                  <div>
-
-                    <span>
-                      TARGET BISNIS
-                    </span>
-
-                    <h2>
-                      Target Bisnis
-                    </h2>
-
-                    <p>
-                      Target digunakan sebagai
-                      dasar evaluasi performa toko.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-form
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Target Penjualan Harian
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        settings.targetDailySales
-                      }
-                      onChange={e =>
-                        updateField(
-                          'targetDailySales',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Target Penjualan Bulanan
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        settings.targetMonthlySales
-                      }
-                      onChange={e =>
-                        updateField(
-                          'targetMonthlySales',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Target Transaksi Harian
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      value={
-                        settings.targetDailyTransactions
-                      }
-                      onChange={e =>
-                        updateField(
-                          'targetDailyTransactions',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-
-                  <div
-                    className="
-                      settings-field
-                    "
-                  >
-
-                    <label>
-                      Target Margin (%)
-                    </label>
-
-                    <input
-                      type="number"
-                      min="0"
-                      max="100"
-                      value={
-                        settings.targetMargin
-                      }
-                      onChange={e =>
-                        updateField(
-                          'targetMargin',
-                          e.target.value
-                        )
-                      }
-                    />
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-target-preview
-                  "
-                >
-
-                  <div>
-
-                    <span>
-                      Target harian
-                    </span>
-
-                    <strong>
-                      {money(
-                        Number(
-                          settings.targetDailySales
-                        )
-                      )}
-                    </strong>
-
-                  </div>
-
-
-                  <div>
-
-                    <span>
-                      Target bulanan
-                    </span>
-
-                    <strong>
-                      {money(
-                        Number(
-                          settings.targetMonthlySales
-                        )
-                      )}
-                    </strong>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-card-foot
-                  "
-                >
-
-                  <div />
-
-                  <button
-                    type="submit"
-                    className="
-                      primary-btn
-                    "
-                    disabled={
-                      saving
-                    }
-                  >
-
-                    {saving
-                      ? 'Menyimpan...'
-                      : 'Simpan Target'
-                    }
-
-                  </button>
-
-                </div>
-
-              </form>
-
-            )}
-
-
-            {/* =================================================
-                KATEGORI
-            ================================================= */}
-
-            {activeSection ===
-              'kategori' && (
-
-              <div
-                className="
-                  settings-detail-card
-                "
-              >
-
-                <div
-                  className="
-                    settings-detail-head
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-detail-icon
-                    "
-                  >
-                    <WalletCards
-                      size={19}
-                    />
-                  </div>
-
-                  <div>
-
-                    <span>
-                      PENGELUARAN
-                    </span>
-
-                    <h2>
-                      Kategori Pengeluaran
-                    </h2>
-
-                    <p>
-                      Kelola kategori biaya
-                      operasional usaha.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-toolbar
-                  "
-                >
-
-                  <div>
-
-                    <strong>
-                      {
-                        categories.length
-                      }
-                    </strong>
-
-                    <span>
-                      kategori tersedia
-                    </span>
-
-                  </div>
-
-
-                  <button
-                    type="button"
-                    className="
-                      primary-btn
-                      small
-                    "
-                    onClick={
-                      openAddCategory
-                    }
-                  >
-
-                    <Plus
-                      size={15}
-                    />
-
-                    Tambah Kategori
-
-                  </button>
-
-                </div>
-
-
-                <div
-                  className="
-                    category-settings-list
-                  "
-                >
-
-                  {categoryLoading ? (
-
-                    <div
-                      className="
-                        settings-inline-loading
-                      "
-                    >
-                      Memuat kategori...
-                    </div>
-
-                  ) : categories.length ===
-                    0 ? (
-
-                    <div
-                      className="
-                        settings-empty
-                      "
-                    >
-
-                      <strong>
-                        Belum ada kategori
-                      </strong>
-
-                      <span>
-                        Tambahkan kategori
-                        untuk mempermudah
-                        pencatatan biaya.
-                      </span>
-
-                    </div>
-
-                  ) : (
-
-                    categories.map(
-                      category => (
-
-                        <div
-                          key={
-                            category.id
-                          }
-                          className="
-                            category-settings-row
-                          "
-                        >
-
-                          <div>
-
-                            <span
-                              className="
-                                category-dot
-                              "
-                            />
-
-                            <strong>
-                              {
-                                category.name
-                              }
-                            </strong>
-
-                          </div>
-
-
-                          <div
-                            className="
-                              category-actions
-                            "
-                          >
-
-                            <button
-
-                              type="button"
-
-                              className="
-                                ghost-icon
-                              "
-
-                              onClick={() =>
-                                openEditCategory(
-                                  category
-                                )
-                              }
-
-                            >
-
-                              <Pencil
-                                size={15}
-                              />
-
-                            </button>
-
-
-                            <button
-
-                              type="button"
-
-                              className="
-                                ghost-icon
-                                danger
-                              "
-
-                              onClick={() =>
-                                deleteCategory(
-                                  category.id
-                                )
-                              }
-
-                            >
-
-                              <Trash2
-                                size={15}
-                              />
-
-                            </button>
-
-                          </div>
-
-                        </div>
-
-                      )
-                    )
-
-                  )}
-
-                </div>
-
-              </div>
-
-            )}
-
-
-            {/* =================================================
-                AKUN
-            ================================================= */}
-
-            {activeSection ===
-              'akun' && (
-
-              <div
-                className="
-                  settings-stack
-                "
-              >
-
-                <div
-                  className="
-                    settings-detail-card
-                  "
-                >
-
-                  <div
-                    className="
-                      settings-detail-head
-                    "
-                  >
-
-                    <div
-                      className="
-                        settings-detail-icon
-                      "
-                    >
-                      <Settings
-                        size={19}
-                      />
-                    </div>
-
-                    <div>
-
-                      <span>
-                        OWNER
-                      </span>
-
-                      <h2>
-                        Akun & Keamanan
-                      </h2>
-
-                      <p>
-                        Kelola profil dan
-                        keamanan akun owner.
-                      </p>
-
-                    </div>
-
-                  </div>
-
-
-                  <div
-                    className="
-                      account-profile
-                    "
-                  >
-
-                    <div
-                      className="
-                        account-avatar
-                      "
-                    >
-                      L
-                    </div>
-
-
-                    <div>
-
-                      <strong>
-                        Linda Kumalasari
-                      </strong>
-
-                      <span>
-                        Owner
-                      </span>
-
-                    </div>
-
-                  </div>
-
-                </div>
-
-
-                <div
-                  className="
-                    settings-detail-card
-                  "
-                >
-
-                  <div
-                    className="
-                      security-row
-                    "
-                  >
-
-                    <div>
-
-                      <strong>
-                        Password
-                      </strong>
-
-                      <span>
-                        Ubah password akun
-                        untuk menjaga keamanan.
-                      </span>
-
-                    </div>
-
-
-                    <button
-                    type="button"
-                    className="
-                      secondary-btn
-                    "
-                    onClick={() => {
-
-                      setPasswordError('');
-
-                      setPasswordForm({
-
-                        currentPassword:
-                          '',
-
-                        newPassword:
-                          '',
-
-                        confirmPassword:
-                          ''
-
-                      });
-
-                      setPasswordModal(
-                        true
-                      );
-
-                    }}
-                  >
-                    Ubah Password
-                  </button>
-
-                  </div>
-
-
-                  <div
-                    className="
-                      security-row
-                    "
-                  >
-
-                    <div>
-
-                      <strong>
-                        Keluar dari aplikasi
-                      </strong>
-
-                      <span>
-                        Sesi owner akan
-                        diakhiri pada perangkat ini.
-                      </span>
-
-                    </div>
-
-
-                    <button
-                      type="button"
-                      className="
-                        secondary-btn
-                        danger-btn
-                      "
-                      onClick={() => {
-
-                        const confirmed =
-                          window.confirm(
-                            'Apakah Anda yakin ingin keluar dari Dapoersari Seller?'
-                          );
-
-
-                        if (
-                          !confirmed
-                        ) {
-                          return;
-                        }
-
-
-                        localStorage.removeItem(
-                          'p2_token'
-                        );
-
-
-                        window.location.href =
-                          '/login';
-
-                      }}
-                    >
-                      Keluar
-                    </button>
-
-                  </div>
-
-                </div>
-
-              </div>
-
-            )}
-
-          </section>
-
-        )}
-
-      </div>
-
-           
-      {passwordModal && (
-
-  <div
-    className="
-      modal-backdrop
-    "
-
-    onMouseDown={(event) => {
-
-      if (
-        event.target ===
-        event.currentTarget
-      ) {
-
-        if (
-          !passwordSaving
-        ) {
-
-          setPasswordModal(
-            false
-          );
-
-        }
-
-      }
-
-    }}
-  >
-
-    <div
-      className="
-        modal-card
-        password-modal
-      "
-      role="dialog"
-      aria-modal="true"
-    >
-
-
-      {/* HEADER */}
-
-      <div
-        className="
-          modal-head
-        "
-      >
-
-        <div>
-
-          <span
-            className="
-              modal-eyebrow
-            "
-          >
-            KEAMANAN AKUN
-          </span>
-
-          <h3>
-            Ubah Password
-          </h3>
-
-        </div>
-
-
-        <button
-
-          type="button"
-
-          className="
-            ghost-icon
-          "
-
-          disabled={
-            passwordSaving
-          }
-
-          onClick={() =>
-            setPasswordModal(
-              false
-            )
-          }
-
-          aria-label="
-            Tutup
-          "
-
-        >
-
-          <X
-            size={18}
-          />
-
-        </button>
-
-      </div>
-
-
-      {/* CONTENT */}
-
-      <form
-        className="
-          password-form
-        "
-        onSubmit={
-          changePassword
-        }
-      >
-
-
-        <div
-          className="
-            password-intro
-          "
-        >
-
-          <div
-            className="
-              password-intro-icon
-            "
-          >
-
-            <Settings
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <strong>
-              Perbarui keamanan akun
-            </strong>
-
-            <span>
-              Gunakan password baru yang
-              sulit ditebak dan mudah
-              kamu ingat.
-            </span>
-
-          </div>
-
-        </div>
-
-
-        {/* PASSWORD LAMA */}
-
-        <label>
-
-          Password Saat Ini
-
-          <input
-
-            type="password"
-
-            value={
-              passwordForm.currentPassword
-            }
-
-            onChange={(event) =>
-              setPasswordForm(
-                (current) => ({
-
-                  ...current,
-
-                  currentPassword:
-                    event.target.value
-
-                })
-              )
-            }
-
-            placeholder="
-              Masukkan password saat ini
-            "
-
-            autoComplete="
-              current-password
-            "
-
-          />
-
-        </label>
-
-
-        {/* PASSWORD BARU */}
-
-        <label>
-
-          Password Baru
-
-          <input
-
-            type="password"
-
-            value={
-              passwordForm.newPassword
-            }
-
-            onChange={(event) =>
-              setPasswordForm(
-                (current) => ({
-
-                  ...current,
-
-                  newPassword:
-                    event.target.value
-
-                })
-              )
-            }
-
-            placeholder="
-              Minimal 6 karakter
-            "
-
-            autoComplete="
-              new-password
-            "
-
-          />
-
-        </label>
-
-
-        {/* KONFIRMASI */}
-
-        <label>
-
-          Konfirmasi Password Baru
-
-          <input
-
-            type="password"
-
-            value={
-              passwordForm.confirmPassword
-            }
-
-            onChange={(event) =>
-              setPasswordForm(
-                (current) => ({
-
-                  ...current,
-
-                  confirmPassword:
-                    event.target.value
-
-                })
-              )
-            }
-
-            placeholder="
-              Ulangi password baru
-            "
-
-            autoComplete="
-              new-password
-            "
-
-          />
-
-        </label>
-
-
-        {passwordError && (
-
-          <div
-            className="
-              password-error
-            "
-          >
-
-            {passwordError}
-
-          </div>
-
-        )}
-
-
-        <div
-          className="
-            modal-actions
-          "
-        >
-
-          <button
-
-            type="button"
-
-            className="
-              secondary-btn
-            "
-
-            disabled={
-              passwordSaving
-            }
-
-            onClick={() =>
-              setPasswordModal(
-                false
-              )
-            }
-
-          >
-            Batal
-          </button>
-
-
-          <button
-
-            type="submit"
-
-            className="
-              primary-btn
-            "
-
-            disabled={
-              passwordSaving
-            }
-
-          >
-
-            {passwordSaving
-              ? 'Menyimpan...'
-              : 'Simpan Password'
-            }
-
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  </div>
-
-)}
-
-
-      {/* =====================================================
-          MODAL KATEGORI
-      ===================================================== */}
-
-      {categoryModal && (
-
-        <div
-          className="
-            modal-backdrop
-          "
-
-          onMouseDown={
-            event => {
-
-              if (
-                event.target ===
-                event.currentTarget
-              ) {
-
-                setCategoryModal(
-                  false
-                );
-
-              }
-
-            }
-          }
-        >
-
-          <div
-            className="
-              modal-card
-              category-modal
-            "
-          >
-
-            <div
-              className="
-                modal-head
-              "
-            >
-
-              <div>
-
-                <span
-                  className="
-                    modal-eyebrow
-                  "
-                >
-                  KATEGORI PENGELUARAN
-                </span>
-
-                <h3>
-                  {
-                    categoryForm.id
-                      ? 'Edit Kategori'
-                      : 'Tambah Kategori'
-                  }
-                </h3>
-
-              </div>
-
-
-              <button
-
-                type="button"
-
-                className="
-                  ghost-icon
-                "
-
-                onClick={() =>
-                  setCategoryModal(
-                    false
-                  )
-                }
-
-              >
-
-                <X
-                  size={18}
-                />
-
-              </button>
-
-            </div>
-
-
-            <form
-              className="
-                settings-modal-form
-              "
-              onSubmit={
-                saveCategory
-              }
-            >
-
-              <label>
-
-                Nama Kategori
-
-                <input
-
-                  type="text"
-
-                  value={
-                    categoryForm.name
-                  }
-
-                  onChange={e =>
-                    setCategoryForm(
-                      current => ({
-                        ...current,
-                        name:
-                          e.target.value
-                      })
-                    )
-                  }
-
-                  placeholder="
-                    Contoh: Bahan Baku
-                  "
-
-                  autoFocus
-
-                />
-
-              </label>
-
-
-              <div
-                className="
-                  modal-actions
-                "
-              >
-
-                <button
-                  type="button"
-                  className="
-                    secondary-btn
-                  "
-                  onClick={() =>
-                    setCategoryModal(
-                      false
-                    )
-                  }
-                >
-                  Batal
-                </button>
-
-
-                <button
-                  type="submit"
-                  className="
-                    primary-btn
-                  "
-                  disabled={
-                    categoryLoading
-                  }
-                >
-
-                  {categoryLoading
-                    ? 'Menyimpan...'
-                    : 'Simpan Kategori'
-                  }
-
-                </button>
-
-              </div>
-
-            </form>
-
-          </div>
-
-        </div>
-
-      )}
-
-    </>
-  );
-}
-
-
 /* =========================================================
-   PROTECTED LAYOUT
+   PROTECTED LAYOUT (SIDEBAR + TOPBAR + CONTENT)
    ========================================================= */
-
 function ProtectedLayout() {
-  const [loading, setLoading] =
-    useState(true);
-
-  const [profile, setProfile] =
-    useState(null);
-
-  const [mobileOpen, setMobileOpen] =
-    useState(false);
-
-  const navigate =
-    useNavigate();
-
-  const location =
-    useLocation();
-
-
-  /* =====================================================
-     LOAD PROFILE
-     ===================================================== */
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
     let mounted = true;
-
     api
       .get('/me')
       .then((response) => {
-        if (!mounted) {
-          return;
-        }
-
-        setProfile(
-          response.data.profile
-        );
+        if (!mounted) return;
+        setProfile(response.data.profile);
       })
       .catch(() => {
-        localStorage.removeItem(
-          'p2_token'
-        );
-
-        navigate(
-          '/login',
-          {
-            replace: true
-          }
-        );
+        localStorage.removeItem('p2_token');
+        navigate('/login', { replace: true });
       })
       .finally(() => {
-        if (mounted) {
-          setLoading(false);
-        }
+        if (mounted) setLoading(false);
       });
 
     return () => {
@@ -2865,705 +183,394 @@ function ProtectedLayout() {
     };
   }, [navigate]);
 
-
-  /* =====================================================
-     CLOSE MOBILE MENU WHEN PAGE CHANGES
-     ===================================================== */
-
   useEffect(() => {
     setMobileOpen(false);
-  }, [
-    location.pathname
-  ]);
-
-
-  /* =====================================================
-     CLOSE POPUPS WHEN MOBILE MENU OPENS
-     ===================================================== */
-
-  useEffect(() => {
-    if (!mobileOpen) {
-      return;
-    }
-
-    document.dispatchEvent(
-      new Event(
-        'dapoersari:close-popups'
-      )
-    );
-  }, [
-    mobileOpen
-  ]);
-
-
-  /* =====================================================
-     LOADING
-     ===================================================== */
+    setNotifOpen(false);
+  }, [location.pathname]);
 
   if (loading) {
     return (
       <div className="boot-screen">
-
         <div className="boot-content">
-
           <div className="boot-logo">
-
-            <img
-              src="/favicon-dapoersari.png"
-              alt="Dapoersari"
-            />
-
+            <img src="/favicon-dapoersari.png" alt="Dapoersari" />
           </div>
-
-
           <div className="boot-text">
-
-            <strong>
-              Dapoersari
-            </strong>
-
-            <span>
-              Owner Workspace
-            </span>
-
+            <strong>Dapoersari Enterprise</strong>
+            <span>Menghubungkan ke server keuangan aman...</span>
           </div>
-
+          <div className="boot-spinner">
+            <div className="spinner" />
+          </div>
         </div>
-
       </div>
     );
   }
 
-
-  /* =====================================================
-     PROTECT ROUTE
-     ===================================================== */
-
   if (!profile) {
-    return (
-      <Navigate
-        to="/login"
-        replace
-      />
-    );
+    return <Navigate to="/login" replace />;
   }
 
+  const ownerName = profile?.full_name?.trim() || 'Owner Dapoersari';
+  const ownerInitial = ownerName.charAt(0).toUpperCase() || 'D';
 
-  /* =====================================================
-     OWNER
-     ===================================================== */
-
-  const ownerName =
-    profile?.full_name?.trim() ||
-    'Owner Dapoersari';
-
-
-  const ownerInitial =
-    ownerName
-      .charAt(0)
-      .toUpperCase() ||
-    'O';
-
-
-  /* =====================================================
-     GREETING
-     ===================================================== */
-
-  const hour =
-    new Date().getHours();
-
-
-  let greeting;
-
-  if (
-    hour >= 5 &&
-    hour < 11
-  ) {
-    greeting =
-      'Selamat pagi';
-  } else if (
-    hour >= 11 &&
-    hour < 15
-  ) {
-    greeting =
-      'Selamat siang';
-  } else if (
-    hour >= 15 &&
-    hour < 18
-  ) {
-    greeting =
-      'Selamat sore';
-  } else {
-    greeting =
-      'Selamat malam';
-  }
-
-
-  /* =====================================================
-     LOGOUT
-     ===================================================== */
+  const hour = new Date().getHours();
+  let greeting = 'Selamat malam';
+  if (hour >= 5 && hour < 11) greeting = 'Selamat pagi';
+  else if (hour >= 11 && hour < 15) greeting = 'Selamat siang';
+  else if (hour >= 15 && hour < 18) greeting = 'Selamat sore';
 
   const logout = () => {
-    const confirmed =
-      window.confirm(
-        'Apakah Anda yakin ingin keluar dari Dapoersari Seller?'
-      );
-
-    if (!confirmed) {
-      return;
-    }
-
-    localStorage.removeItem(
-      'p2_token'
-    );
-
-    navigate(
-      '/login',
-      {
-        replace: true
-      }
-    );
+    const confirmed = window.confirm('Apakah Anda yakin ingin keluar dari Dapoersari Executive Portal?');
+    if (!confirmed) return;
+    localStorage.removeItem('p2_token');
+    navigate('/login', { replace: true });
   };
-
-
-  /* =====================================================
-     MOBILE MENU
-     ===================================================== */
-
-  const toggleMobileMenu = () => {
-    setMobileOpen(
-      (current) => !current
-    );
-  };
-
-
-  const closeMobileMenu = () => {
-    setMobileOpen(false);
-  };
-
-
-  /* =====================================================
-     PAGE
-     ===================================================== */
 
   return (
     <div className="app-shell">
-
-
-      {/* =================================================
-          SIDEBAR
-          ================================================= */}
-
-      <aside
-        className={
-          `sidebar ${
-            mobileOpen
-              ? 'open'
-              : ''
-          }`
-        }
-      >
-
+      {/* SIDEBAR */}
+      <aside className={`sidebar ${mobileOpen ? 'open' : ''}`}>
         <div className="brand">
-
           <div className="brand-mark">
-
-            <img
-              src="/favicon-dapoersari.png"
-              alt="Dapoersari"
-            />
-
+            <img src="/favicon-dapoersari.png" alt="Dapoersari" />
           </div>
-
-
           <div className="brand-copy">
-
-            <strong>
-              Dapoersari
-            </strong>
-
-            <span>
-              Owner Workspace
-            </span>
-
+            <strong>Dapoersari</strong>
+            <span>Executive Finance Hub</span>
           </div>
-
         </div>
 
-
-        <div className="sidebar-caption">
-          MANAGEMENT
-        </div>
-
-
+        <div className="sidebar-caption">IKHTISAR UTAMA</div>
         <nav className="nav-list">
-
-          <NavItem
-            to="/"
-            icon={
-              <Gauge
-                size={18}
-              />
-            }
-            label="Dashboard"
-          />
-
-
-          <NavItem
-            to="/penjualan"
-            icon={
-              <Receipt
-                size={18}
-              />
-            }
-            label="Penjualan"
-          />
-
-
-          <NavItem
-            to="/pengeluaran"
-            icon={
-              <WalletCards
-                size={18}
-              />
-            }
-            label="Pengeluaran"
-          />
-
-
-          <NavItem
-            to="/analitik"
-            icon={
-              <BarChart3
-                size={18}
-              />
-            }
-            label="Performa Toko"
-          />
-
-
-          <NavItem
-            to="/laporan"
-            icon={
-              <FileText
-                size={18}
-              />
-            }
-            label="Laporan"
-          />
-
-
-          <NavItem
-            to="/pengaturan"
-            icon={
-              <Settings
-                size={18}
-              />
-            }
-            label="Pengaturan"
-          />
-
+          <NavItem to="/" icon={<Gauge size={18} />} label="Dashboard" />
         </nav>
 
+        <div className="sidebar-caption">OPERASIONAL KEUANGAN</div>
+        <nav className="nav-list">
+          <NavItem to="/penjualan" icon={<Receipt size={18} />} label="Penjualan & Kasir" />
+          <NavItem to="/pengeluaran" icon={<WalletCards size={18} />} label="Pengeluaran (OpEx)" />
+        </nav>
+
+        <div className="sidebar-caption">INTELIJEN BISNIS</div>
+        <nav className="nav-list">
+          <NavItem to="/analitik" icon={<BarChart3 size={18} />} label="Performa Toko" />
+          <NavItem to="/laporan" icon={<FileText size={18} />} label="Laporan Eksekutif" />
+        </nav>
+
+        <div className="sidebar-caption">SISTEM & AKUN</div>
+        <nav className="nav-list">
+          <NavItem to="/pengaturan" icon={<Settings size={18} />} label="Pengaturan" />
+        </nav>
 
         <div className="sidebar-footer">
-
-          <button
-            type="button"
-            className="logout-btn"
-            onClick={logout}
-          >
-
-            <LogOut
-              size={17}
-            />
-
-            <span>
-              Keluar
-            </span>
-
+          <div className="owner-mini">
+            <div className="avatar">{ownerInitial}</div>
+            <div className="owner-meta">
+              <strong>{ownerName}</strong>
+              <span>Executive Owner</span>
+            </div>
+          </div>
+          <button type="button" className="logout-btn" onClick={logout} title="Keluar dari sesi">
+            <LogOut size={16} />
+            <span>Keluar Sesi</span>
           </button>
-
         </div>
-
       </aside>
 
-
-      {/* =================================================
-          MOBILE BACKDROP
-          ================================================= */}
-
+      {/* MOBILE BACKDROP */}
       {mobileOpen && (
-
-        <div
-          className="mobile-backdrop"
-          onClick={
-            closeMobileMenu
-          }
-          aria-hidden="true"
-        />
-
+        <div className="mobile-backdrop" onClick={() => setMobileOpen(false)} aria-hidden="true" />
       )}
 
-
-      {/* =================================================
-          MAIN
-          ================================================= */}
-
+      {/* MAIN CONTAINER */}
       <main className="main-area">
-
-
-        {/* =================================================
-            TOPBAR
-            ================================================= */}
-
-        <header
-          className="topbar"
-        >
-
-
-          {/* MOBILE MENU */}
-
-          <button
-            type="button"
-            className="mobile-menu-button mobile-only"
-            onClick={
-              toggleMobileMenu
-            }
-            aria-label={
-              mobileOpen
-                ? 'Tutup menu'
-                : 'Buka menu'
-            }
-            aria-expanded={
-              mobileOpen
-            }
-          >
-
-            {mobileOpen ? (
-              <X
-                size={21}
-              />
-            ) : (
-              <MenuIcon
-                size={21}
-              />
-            )}
-
-          </button>
-
-
-          {/* BREADCRUMB */}
-
-          <div className="crumb">
-
-            <span>
-              Owner
-            </span>
-
-            <b>
-              •
-            </b>
-
-            <strong>
-              {pageName(
-                location.pathname
-              )}
-            </strong>
-
-          </div>
-
-
-          {/* TOP ACTIONS */}
-
-          <div className="top-actions">
-
-
-            {/* DATE */}
-
-            <div className="date-chip">
-
-              <CalendarDays
-                size={16}
-              />
-
-              <span>
-                {new Date()
-                  .toLocaleDateString(
-                    'id-ID',
-                    {
-                      weekday:
-                        'long',
-                      day:
-                        '2-digit',
-                      month:
-                        'long',
-                      year:
-                        'numeric'
-                    }
-                  )}
-              </span>
-
-            </div>
-
-
-            {/* NOTIFICATION */}
-
+        {/* TOPBAR */}
+        <header className="topbar">
+          <div className="topbar-left">
             <button
               type="button"
-              className="notification"
-              aria-label="Notifikasi"
+              className="mobile-menu-button mobile-only"
+              onClick={() => setMobileOpen(!mobileOpen)}
+              aria-label="Toggle menu"
             >
-
-              <Bell
-                size={18}
-              />
-
-              <i />
-
+              {mobileOpen ? <X size={20} /> : <MenuIcon size={20} />}
             </button>
 
-
-            {/* PROFILE */}
-
-            <div
-              className="profile-chip"
-              title={ownerName}
-            >
-
-              <div className="profile-avatar">
-
-                {ownerInitial}
-
-              </div>
-
-
-              <div className="profile-copy">
-
-                <strong>
-                  {ownerName}
-                </strong>
-
-                <span>
-                  Owner
-                </span>
-
-              </div>
-
-
-              <ChevronDown
-                size={15}
-                className="profile-chevron"
-              />
-
+            <div className="crumb">
+              <span className="crumb-root">
+                <Building2 size={14} />
+                <span>Enterprise</span>
+              </span>
+              <span className="crumb-sep">/</span>
+              <strong className="crumb-current">{pageName(location.pathname)}</strong>
             </div>
-
           </div>
 
+          <div className="top-actions">
+            <div className="date-chip">
+              <CalendarDays size={14} />
+              <span>
+                {new Date().toLocaleDateString('id-ID', {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })}
+              </span>
+            </div>
+
+            <div className="notif-wrapper">
+              <button
+                type="button"
+                className={`notification ${notifOpen ? 'active' : ''}`}
+                aria-label="Notifikasi"
+                onClick={() => setNotifOpen(!notifOpen)}
+              >
+                <Bell size={17} />
+                <i />
+              </button>
+
+              {notifOpen && (
+                <div className="notif-dropdown">
+                  <div className="notif-head">
+                    <strong>Notifikasi Sistem</strong>
+                    <span className="notif-badge">Live</span>
+                  </div>
+                  <div className="notif-body">
+                    <div className="notif-item">
+                      <div className="notif-icon-box success">
+                        <CheckCircle2 size={16} />
+                      </div>
+                      <div className="notif-text">
+                        <strong>Sinkronisasi Transaksi Selesai</strong>
+                        <p>Data penjualan dan potongan platform telah diperbarui secara real-time.</p>
+                        <small>Baru saja</small>
+                      </div>
+                    </div>
+                    <div className="notif-item">
+                      <div className="notif-icon-box primary">
+                        <Sparkles size={16} />
+                      </div>
+                      <div className="notif-text">
+                        <strong>Laporan Keuangan Tersedia</strong>
+                        <p>Analisis tren laba rugi dan rekomendasi stok telah dikalkulasi.</p>
+                        <small>Hari ini</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="profile-chip" onClick={() => navigate('/pengaturan')} title="Buka Pengaturan">
+              <div className="profile-avatar">{ownerInitial}</div>
+              <div className="profile-copy">
+                <strong>{ownerName}</strong>
+                <span>Executive Owner</span>
+              </div>
+              <ChevronDown size={14} className="profile-chevron" />
+            </div>
+          </div>
         </header>
 
-
-        {/* =================================================
-            PAGE CONTENT
-            ================================================= */}
-
+        {/* PAGE BODY */}
         <div className="page-content">
-
           <Routes>
-
-            <Route
-              path="/"
-              element={
-                <Dashboard
-                  greeting={
-                    greeting
-                  }
-                  ownerName={
-                    ownerName
-                  }
-                />
-              }
-            />
-
-
-            <Route
-              path="/penjualan"
-              element={
-                <Sales />
-              }
-            />
-
-
-            <Route
-              path="/pengeluaran"
-              element={
-                <Finance />
-              }
-            />
-
-
-            <Route
-              path="/analitik"
-              element={
-                <Analytics />
-              }
-            />
-
-
-            <Route
-              path="/laporan"
-              element={
-                <Reports />
-              }
-            />
-
-
-            <Route
-              path="/pengaturan"
-              element={
-                <SettingsPage />
-              }
-            />
-
-
-            <Route
-              path="*"
-              element={
-                <Navigate
-                  to="/"
-                  replace
-                />
-              }
-            />
-
+            <Route path="/" element={<Dashboard greeting={greeting} ownerName={ownerName} />} />
+            <Route path="/penjualan" element={<Sales />} />
+            <Route path="/pengeluaran" element={<Finance />} />
+            <Route path="/analitik" element={<Analytics />} />
+            <Route path="/laporan" element={<Reports />} />
+            <Route path="/pengaturan" element={<SettingsPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-
         </div>
-
       </main>
-
     </div>
   );
 }
 
-
 /* =========================================================
-   NAVIGATION
+   NAVIGATION ITEM HELPER
    ========================================================= */
-
-function NavItem({
-  to,
-  icon,
-  label
-}) {
-
+function NavItem({ to, icon, label }) {
   return (
     <NavLink
       to={to}
-      end={
-        to === '/'
-      }
-      className={
-        ({ isActive }) =>
-          `nav-item ${
-            isActive
-              ? 'active'
-              : ''
-          }`
-      }
+      end={to === '/'}
+      className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
     >
-
-      {icon}
-
-      <span>
-        {label}
-      </span>
-
+      <span className="nav-icon">{icon}</span>
+      <span className="nav-label">{label}</span>
+      <ChevronRight size={14} className="nav-arrow" />
     </NavLink>
   );
 }
 
-
 function pageName(path) {
-
-  if (
-    path === '/'
-  ) {
-    return 'Dashboard';
-  }
-
-  if (
-    path.includes(
-      'penjualan'
-    )
-  ) {
-    return 'Penjualan';
-  }
-
-  if (
-    path.includes(
-      'pengeluaran'
-    )
-  ) {
-    return 'Pengeluaran';
-  }
-
-  if (
-    path.includes(
-      'analitik'
-    )
-  ) {
-    return 'Performa Toko';
-  }
-
-  if (
-    path.includes(
-      'rekomendasi'
-    )
-  ) {
-    return 'Performa Toko';
-  }
-
-  if (
-    path.includes(
-      'laporan'
-    )
-  ) {
-    return 'Laporan';
-  }
-
-  return 'Pengaturan';
+  if (path === '/') return 'Dashboard Eksekutif';
+  if (path.includes('penjualan')) return 'Penjualan & Kasir';
+  if (path.includes('pengeluaran')) return 'Pengeluaran (OpEx)';
+  if (path.includes('analitik') || path.includes('rekomendasi')) return 'Performa Toko & Analitik';
+  if (path.includes('laporan')) return 'Laporan Keuangan & Manajemen';
+  return 'Pusat Pengaturan';
 }
 
+/* =========================================================
+   PAGE HEADER HELPER
+   ========================================================= */
+function PageHeader({ eyebrow, title, subtitle, action, badge }) {
+  return (
+    <div className="page-head">
+      <div className="page-head-copy">
+        {eyebrow && <div className="eyebrow">{eyebrow}</div>}
+        <div className="page-head-title-row">
+          <h1>{title}</h1>
+          {badge && <span className="page-head-badge">{badge}</span>}
+        </div>
+        {subtitle && <p>{subtitle}</p>}
+      </div>
+      {action && <div className="head-actions">{action}</div>}
+    </div>
+  );
+}
 
 /* =========================================================
-   LOGIN
+   RANGE SELECTOR COMPONENT
    ========================================================= */
+function useRange(initial = '30d') {
+  const [range, setRange] = useState(initial);
+  return [range, setRange];
+}
 
+function RangeSelect({ value, onChange }) {
+  return (
+    <div className="range-select-wrapper">
+      <Clock size={14} className="range-select-icon" />
+      <select className="range-select" value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="today">Hari Ini</option>
+        <option value="7d">7 Hari Terakhir</option>
+        <option value="30d">30 Hari Terakhir</option>
+        <option value="90d">90 Hari Terakhir</option>
+      </select>
+    </div>
+  );
+}
+
+/* =========================================================
+   METRIC STAT CARD COMPONENT
+   ========================================================= */
+function Metric({ label, value, sub, icon, trend, positive = true, tooltip }) {
+  return (
+    <div className="metric-card">
+      <div className="metric-top">
+        <span className="metric-label">{label}</span>
+        <div className={`metric-icon-box ${positive ? 'positive' : 'negative'}`}>{icon}</div>
+      </div>
+      <div className="metric-value-row">
+        <strong className="metric-value">{value}</strong>
+      </div>
+      <div className="metric-footer">
+        <span className={`metric-sub ${positive ? 'positive' : 'negative'}`}>
+          {positive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+          <span>{sub}</span>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   PANEL COMPONENT
+   ========================================================= */
+function Panel({ title, hint, action, children }) {
+  return (
+    <section className="panel">
+      <div className="panel-head">
+        <div>
+          <strong>{title}</strong>
+          {hint && <span>{hint}</span>}
+        </div>
+        {action && <div className="panel-action">{action}</div>}
+      </div>
+      <div className="panel-body">{children}</div>
+    </section>
+  );
+}
+
+/* =========================================================
+   CHANNEL BADGE COMPONENT
+   ========================================================= */
+function ChannelBadge({ channel }) {
+  const ch = (channel || 'website').toLowerCase();
+  return (
+    <span className={`channel-badge ${ch}`}>
+      <span className="channel-dot" />
+      <span>{channelLabel(ch)}</span>
+    </span>
+  );
+}
+
+function channelLabel(c) {
+  const map = {
+    website: 'Website Online',
+    offline: 'Offline POS',
+    shopeefood: 'ShopeeFood'
+  };
+  return map[c] || c || 'Website';
+}
+
+/* =========================================================
+   LOADING & ERROR STATES
+   ========================================================= */
+function LoadingPage() {
+  return (
+    <div className="loading-page">
+      <div className="spinner" />
+      <span>Mengambil data transaksi dan laporan...</span>
+    </div>
+  );
+}
+
+function ErrorState({ message }) {
+  return (
+    <div className="error-page">
+      <div className="error-icon">
+        <AlertCircle size={24} />
+      </div>
+      <h2>Gagal Memuat Data</h2>
+      <p>{message || 'Terjadi gangguan saat menghubungkan ke server API.'}</p>
+      <button type="button" className="primary-btn" onClick={() => window.location.reload()}>
+        <RefreshCw size={15} />
+        <span>Coba Lagi</span>
+      </button>
+    </div>
+  );
+}
+
+/* =========================================================
+   1. LOGIN COMPONENT (ENTERPRISE SPLIT SCREEN)
+   ========================================================= */
 function Login() {
   const [form, setForm] = useState({
     email: '',
     password: ''
   });
-
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [loginPhase, setLoginPhase] = useState('intro');
-
   const navigate = useNavigate();
-
-  /* =====================================================
-     SPLASH TIMING
-     ===================================================== */
 
   useEffect(() => {
     const introTimer = setTimeout(() => {
       setLoginPhase('exiting');
-    }, 2300);
+    }, 1800);
 
     const loginTimer = setTimeout(() => {
       setLoginPhase('login');
-    }, 3000);
+    }, 2400);
 
     return () => {
       clearTimeout(introTimer);
@@ -3571,3982 +578,1245 @@ function Login() {
     };
   }, []);
 
-  /* =====================================================
-     LOGIN SUBMIT
-     ===================================================== */
-
   const submit = async (e) => {
     e.preventDefault();
-
-    if (busy) {
-      return;
-    }
+    if (busy) return;
 
     setBusy(true);
     setError('');
 
     try {
-      const response = await axios.post(
-        `${API}/auth/login`,
-        form
-      );
-
-      const token =
-        response?.data?.session?.access_token;
-
+      const response = await axios.post(`${API}/auth/login`, form);
+      const token = response?.data?.session?.access_token;
       if (!token) {
-        throw new Error(
-          'Token login tidak ditemukan.'
-        );
+        throw new Error('Token otentikasi tidak ditemukan dalam respon.');
       }
-
-      localStorage.setItem(
-        'p2_token',
-        token
-      );
-
-      navigate('/', {
-        replace: true
-      });
-
+      localStorage.setItem('p2_token', token);
+      navigate('/', { replace: true });
     } catch (err) {
-      console.error(
-        'Login error:',
-        err
-      );
-
-      setError(
-        err?.response?.data?.error ||
-        err?.message ||
-        'Login gagal.'
-      );
-
+      console.error('Login error:', err);
+      setError(err?.response?.data?.error || err?.message || 'Email atau password salah.');
     } finally {
       setBusy(false);
     }
   };
 
+  const fillDemo = () => {
+    setForm({
+      email: 'owner@dapoersari.com',
+      password: 'password123'
+    });
+  };
+
   return (
-    <div
-      className={`login-page phase-${loginPhase}`}
-    >
-
-      {/* =================================================
-          BACKGROUND
-          ================================================= */}
-
+    <div className={`login-page phase-${loginPhase}`}>
+      {/* BACKGROUND PARTICLES & MESH */}
       <div className="login-background">
         <div className="login-glow login-glow-a" />
         <div className="login-glow login-glow-b" />
-        <div className="login-grid" />
+        <div className="login-grid-mesh" />
       </div>
 
-
-      {/* =================================================
-          SPLASH SCREEN
-          ================================================= */}
-
+      {/* SPLASH INTRO OVERLAY */}
       <div className="login-splash">
-
-        <div className="splash-orb splash-orb-a" />
-        <div className="splash-orb splash-orb-b" />
-
         <div className="splash-content">
-
           <div className="splash-logo">
-            <img
-              src="/favicon-dapoersari.png"
-              alt="Dapoersari"
-            />
+            <img src="/favicon-dapoersari.png" alt="Dapoersari" />
           </div>
-
-          <span className="splash-eyebrow">
-            OWNER MANAGEMENT
-          </span>
-
+          <span className="splash-eyebrow">ENTERPRISE FINANCIAL PORTAL</span>
           <h1>
-            Control the
-            <br />
-            <em>business</em>.
+            Dapoersari <em>Finance</em>
           </h1>
-
-          <p>
-            Ruang kerja owner untuk
-            memantau penjualan,
-            keuangan, dan kinerja
-            operasional Dapoersari.
-          </p>
-
+          <p>Sistem manajemen keuangan, omzet penjualan, dan performa bisnis terintegrasi.</p>
           <div className="splash-note">
-            <Sparkles size={16} />
-
-            <span>
-              Data transaksi tersinkron
-              langsung dengan aktivitas
-              penjualan.
-            </span>
+            <ShieldCheck size={16} />
+            <span>Koneksi aman terenkripsi 256-bit TLS</span>
           </div>
-
         </div>
-
       </div>
 
-
-      {/* =================================================
-          LOGIN PANEL
-          ================================================= */}
-
-      <div className="login-panel">
-
-        <div className="login-center">
-
-          {/* =================================================
-              BRANDING
-              ================================================= */}
-
-          <div className="login-brand">
-
-            <div className="login-brand-logo">
-              <img
-                src="/favicon-dapoersari.png"
-                alt="Dapoersari"
-              />
+      {/* LEFT SHOWCASE PANEL (DESKTOP) */}
+      <div className="login-showcase">
+        <div className="showcase-content">
+          <div className="showcase-brand">
+            <div className="showcase-logo">
+              <img src="/favicon-dapoersari.png" alt="Dapoersari" />
             </div>
-
-            <div className="login-brand-name">
-              Dapoersari
+            <div>
+              <h3>Dapoersari Enterprise</h3>
+              <span>Financial Control & Intelligence</span>
             </div>
-
-            <div className="login-brand-divider" />
-
-            <span className="login-eyebrow">
-              OWNER MANAGEMENT
-            </span>
-
-            <h1>
-              Masuk ke Dapoersari
-              <br />
-              <span>Seller</span>
-            </h1>
-
-            <p>
-              Kelola penjualan, keuangan,
-              dan performa bisnis dalam
-              satu ruang kerja.
-            </p>
-
           </div>
 
+          <div className="showcase-hero">
+            <h1>
+              Kontrol Penuh <br />
+              <span className="gradient-text">Keuangan Bisnis Anda</span>
+            </h1>
+            <p>
+              Pantau arus kas kotor & bersih, potongan multi-channel, catatan operasional, dan laporan laba rugi dalam satu portal terpadu.
+            </p>
+          </div>
 
-          {/* =================================================
-              LOGIN CARD
-              ================================================= */}
+          <div className="showcase-feature-cards">
+            <div className="showcase-card">
+              <div className="showcase-card-icon">
+                <Receipt size={18} />
+              </div>
+              <div>
+                <strong>Multi-Channel Reconciliation</strong>
+                <span>Website, Kasir Offline, dan ShopeeFood tercatat otomatis.</span>
+              </div>
+            </div>
 
+            <div className="showcase-card">
+              <div className="showcase-card-icon">
+                <Target size={18} />
+              </div>
+              <div>
+                <strong>Margin & Profit Intelligence</strong>
+                <span>Kalkulasi otomatis margin laba bersih setelah potongan platform.</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="showcase-footer">
+            <div className="security-tag">
+              <ShieldCheck size={15} />
+              <span>Enterprise Grade Security • Dapoersari Suite v2.0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT LOGIN FORM PANEL */}
+      <div className="login-panel">
+        <div className="login-center">
           <div className="login-card">
+            <div className="login-card-head">
+              <div className="login-card-logo">
+                <img src="/favicon-dapoersari.png" alt="Dapoersari" />
+              </div>
+              <h2>Selamat Datang Kembali</h2>
+              <p>Masuk ke portal eksekutif owner Dapoersari</p>
+            </div>
 
-            <form
-              onSubmit={submit}
-              className="login-form"
-            >
-
-              {/* EMAIL */}
-
-              <label>
-                Email
-
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      email:
-                        e.target.value
-                    })
-                  }
-                  placeholder="owner@email.com"
-                  autoComplete="email"
-                  required
-                />
-              </label>
-
-
-              {/* PASSWORD */}
-
-              <label>
-                Password
-
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) =>
-                    setForm({
-                      ...form,
-                      password:
-                        e.target.value
-                    })
-                  }
-                  placeholder="••••••••"
-                  autoComplete="current-password"
-                  required
-                />
-              </label>
-
-
-              {/* ERROR */}
-
+            <form onSubmit={submit} className="login-form">
               {error && (
                 <div className="error-box">
-                  {error}
+                  <AlertCircle size={16} />
+                  <span>{error}</span>
                 </div>
               )}
 
-
-              {/* LOGIN BUTTON */}
-
-              <button
-                type="submit"
-                className="primary-btn login-submit"
-                disabled={busy}
-              >
-
-                <span>
-                  {busy
-                    ? 'Memproses...'
-                    : 'Masuk'}
-                </span>
-
-                <ArrowUpRight
-                  size={18}
-                />
-
-              </button>
-
-            </form>
-
-
-            {/* SECURITY */}
-
-            <div className="login-security">
-
-              <LockIcon />
-
-              <span>
-                Akses aman untuk akun Owner
-              </span>
-
-            </div>
-
-          </div>
-
-
-          {/* =================================================
-              FOOTER
-              ================================================= */}
-
-          <div className="login-footer">
-            Dapoersari Owner Workspace
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
-  );
-}
-
-
-function LockIcon() {
-
-  return (
-    <span className="tiny-lock">
-      ●
-    </span>
-  );
-}
-
-
-/* =========================================================
-   COMMON
-   ========================================================= */
-
-function useRange(
-  initial = '30d'
-) {
-
-  const [
-    range,
-    setRange
-  ] = useState(initial);
-
-  return [
-    range,
-    setRange
-  ];
-}
-
-
-function RangeSelect({
-  value,
-  onChange
-}) {
-
-  return (
-    <select
-      className="range-select"
-      value={value}
-      onChange={
-        (e) =>
-          onChange(
-            e.target.value
-          )
-      }
-    >
-
-      <option value="today">
-        Hari ini
-      </option>
-
-      <option value="7d">
-        7 hari
-      </option>
-
-      <option value="30d">
-        30 hari
-      </option>
-
-      <option value="90d">
-        90 hari
-      </option>
-
-    </select>
-  );
-}
-
-
-function PageHeader({
-  eyebrow,
-  title,
-  subtitle,
-  action
-}) {
-
-  return (
-    <div className="page-head">
-
-      <div>
-
-        <div className="eyebrow dark">
-          {eyebrow}
-        </div>
-
-        <h1>
-          {title}
-        </h1>
-
-        <p>
-          {subtitle}
-        </p>
-
-      </div>
-
-
-      {action}
-
-    </div>
-  );
-}
-
-
-function Metric({
-  label,
-  value,
-  sub,
-  icon,
-  positive = true
-}) {
-
-  return (
-    <div className="metric-card">
-
-      <div className="metric-top">
-
-        <span>
-          {label}
-        </span>
-
-        <div className="metric-icon">
-          {icon}
-        </div>
-
-      </div>
-
-
-      <strong>
-        {value}
-      </strong>
-
-
-      <div
-        className={
-          `metric-sub ${
-            positive
-              ? 'positive'
-              : ''
-          }`
-        }
-      >
-
-        {positive ? (
-          <ArrowUpRight
-            size={14}
-          />
-        ) : (
-          <ArrowDownRight
-            size={14}
-          />
-        )}
-
-        {sub}
-
-      </div>
-
-    </div>
-  );
-}
-
-/* =========================================================
-SAPAAN DASHBOARD
-========================================================= */
-
-function getGreeting() {
-  const hour =
-    new Date().getHours();
-
-  if (hour >= 5 && hour < 11) {
-    return 'Selamat pagi';
-  }
-
-  if (hour >= 11 && hour < 15) {
-    return 'Selamat siang';
-  }
-
-  if (hour >= 15 && hour < 18) {
-    return 'Selamat sore';
-  }
-
-  return 'Selamat malam';
-}
-
-
-/* =========================================================
-   DASHBOARD
-   ========================================================= */
-
-function Dashboard({
-  greeting,
-  ownerName
-}) {
-
-  const [
-    range,
-    setRange
-  ] = useRange('30d');
-
-    
-  const [
-    data,
-    setData
-  ] = useState(null);
-
-  
-  const [
-    error,
-    setError
-  ] = useState('');
-
-
-  useEffect(() => {
-
-    setError('');
-
-    api
-      .get(
-        '/dashboard',
-        {
-          params: {
-            range
-          }
-        }
-      )
-
-      .then(
-        (r) =>
-          setData(
-            r.data
-          )
-      )
-
-      .catch(
-        (e) =>
-          setError(
-            e?.response
-              ?.data
-              ?.error ||
-            'Gagal memuat dashboard.'
-          )
-      );
-
-  }, [range]);
-
-
-          if (error) {
-            return (
-              <ErrorState
-                message={error}
-              />
-            );
-          }
-
-
-          if (!data) {
-            return (
-              <LoadingPage />
-            );
-          }
-
-
-          const s =
-            data.summary;
-
-
-          return (
-            <>
-
-           <section className="dashboard-greeting">
-            <div className="dashboard-greeting-main">
-
-              <div className="dashboard-greeting-label">
-                {greeting}
+              <div className="form-group">
+                <label htmlFor="email-input">Alamat Email</label>
+                <div className="input-with-icon">
+                  <input
+                    id="email-input"
+                    type="email"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    placeholder="owner@dapoersari.com"
+                    autoComplete="email"
+                    required
+                  />
+                </div>
               </div>
 
-              <h2>
-                {ownerName}
-              </h2>
-
-              <p>
-                Ringkasan kinerja bisnis Anda untuk hari ini.
-              </p>
-
-            </div>
-          </section>
-
-      <PageHeader
-       title="Dashboard Bisnis"
-        subtitle="Ringkasan kinerja penjualan dan keuangan Dapoersari."
-        action={
-          <RangeSelect
-            value={range}
-            onChange={setRange}
-          />
-        }
-      />
-
-
-      <div className="metric-grid">
-
-        <Metric
-          label="Penjualan Kotor"
-          value={
-            shortMoney(
-              s.grossSales
-            )
-          }
-          sub={
-            `${s.transactionCount} transaksi selesai`
-          }
-          icon={
-            <CircleDollarSign
-              size={18}
-            />
-          }
-        />
-
-
-        <Metric
-          label="Penjualan Bersih"
-          value={
-            shortMoney(
-              s.netSales
-            )
-          }
-          sub="setelah potongan platform"
-          icon={
-            <TrendingUp
-              size={18}
-            />
-          }
-        />
-
-
-        <Metric
-          label="Pengeluaran"
-          value={
-            shortMoney(
-              s.expenseTotal
-            )
-          }
-          sub={
-            `${data.expenseCount} catatan pengeluaran`
-          }
-          icon={
-            <WalletCards
-              size={18}
-            />
-          }
-          positive={false}
-        />
-
-
-        <Metric
-          label="Laba Bersih"
-          value={
-            shortMoney(
-              s.netProfit
-            )
-          }
-          sub={
-            `${s.grossSales ? ((s.netProfit / s.grossSales) * 100).toFixed(1) : 0}% margin`
-          }
-          icon={
-            <Target
-              size={18}
-            />
-          }
-        />
-
-      </div>
-
-
-      <div className="two-col-grid">
-
-        <Panel
-          title="Tren penjualan"
-          hint="Periode terpilih"
-        >
-
-          <div className="chart-box">
-
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-
-              <LineChart
-                data={
-                  data.trend
-                }
-              >
-
-                <CartesianGrid
-                  vertical={false}
-                  strokeDasharray="3 3"
-                  stroke="#e7e8eb"
-                />
-
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={
-                    dateLabel
-                  }
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={11}
-                />
-
-                <YAxis
-                  tickFormatter={
-                    shortMoney
-                  }
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={11}
-                />
-
-                <Tooltip
-                  formatter={
-                    (v) =>
-                      money(v)
-                  }
-                  labelFormatter={
-                    (l) =>
-                      new Date(l)
-                        .toLocaleDateString(
-                          'id-ID'
-                        )
-                  }
-                />
-
-                <Line
-                  type="monotone"
-                  dataKey="sales"
-                  stroke="#111827"
-                  strokeWidth={3}
-                  dot={false}
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                />
-
-              </LineChart>
-
-            </ResponsiveContainer>
-
-          </div>
-
-        </Panel>
-
-
-        <Panel
-          title="Kategori penjualan"
-          hint="Omzet kotor"
-        >
-
-          <div className="channel-list">
-
-            {Object.entries(
-              s.channel
-            ).map(
-              ([
-                key,
-                val
-              ]) => (
-
-                <div
-                  className="channel-row"
-                  key={key}
-                >
-
-                  <div>
-
-                    <span className="dot" />
-
-                    <strong>
-                      {channelLabel(
-                        key
-                      )}
-                    </strong>
-
-                  </div>
-
-                  <strong>
-                    {money(val)}
-                  </strong>
-
+              <div className="form-group">
+                <div className="label-row">
+                  <label htmlFor="password-input">Kata Sandi</label>
                 </div>
+                <div className="input-with-icon password-group">
+                  <input
+                    id="password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    value={form.password}
+                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    placeholder="Masukkan kata sandi akun"
+                    autoComplete="current-password"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle-btn"
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                    aria-label={showPassword ? 'Sembunyikan sandi' : 'Lihat sandi'}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+              </div>
 
-              )
-            )}
-
-          </div>
-
-
-          <div className="mini-highlight">
-
-            <div>
-
-              <span>
-                Potongan ShopeeFood
-              </span>
-
-              <strong>
-                {money(
-                  s.platformDeduction
+              <button type="submit" className="primary-btn login-submit" disabled={busy}>
+                {busy ? (
+                  <>
+                    <div className="spinner small" />
+                    <span>Memverifikasi Akses...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Masuk ke Workspace</span>
+                    <ArrowUpRight size={18} />
+                  </>
                 )}
-              </strong>
+              </button>
+            </form>
 
+            <div className="login-security">
+              <Lock size={13} className="tiny-lock" />
+              <span>Sesi terenkripsi & khusus akun terverifikasi</span>
             </div>
-
-            <Percent
-              size={22}
-            />
-
           </div>
 
-        </Panel>
-
-      </div>
-
-
-      <div className="insight-strip">
-
-        <div className="insight-icon">
-          <Sparkles
-            size={18}
-          />
+          <div className="login-footer">
+            <span>© {new Date().getFullYear()} Dapoersari Financial Suite • Hak Cipta Dilindungi</span>
+          </div>
         </div>
-
-
-        <div>
-
-          <strong>
-            Owner insight
-          </strong>
-
-          <span>
-
-            {s.transactionCount
-              ? `Periode ini mencatat ${s.transactionCount} transaksi selesai. Gunakan Performa Toko untuk melihat produk dan jam paling potensial.`
-              : 'Belum ada transaksi selesai pada periode ini.'
-            }
-
-          </span>
-
-        </div>
-
       </div>
-
-    </>
+    </div>
   );
 }
 
-
 /* =========================================================
-   SALES
+   2. DASHBOARD COMPONENT
    ========================================================= */
-
-function Sales() {
-
-  const [selectedOrder, setSelectedOrder] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false); 
-
-  const openOrderDetail = async (order) => {
-  setDetailLoading(true);
-
-  try {
-    const response = await api.get(
-      `/sales/${order.id}`
-    );
-
-    setSelectedOrder(
-      response.data
-    );
-
-  } catch (e) {
-
-    console.error(
-      'Gagal memuat detail transaksi:',
-      e
-    );
-
-    alert(
-      e?.response?.data?.error ||
-      'Detail transaksi gagal dimuat.'
-    );
-
-  } finally {
-    setDetailLoading(false);
-  }
-};
-
-  const [
-    range,
-    setRange
-  ] = useRange('30d');
-
-
-  const [
-    rows,
-    setRows
-  ] = useState(null);
-
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
+function Dashboard({ greeting, ownerName }) {
+  const [range, setRange] = useRange('30d');
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
-
-    setRows(null);
     setError('');
-
-
     api
-      .get(
-        '/sales',
-        {
-          params: {
-            range
-          }
-        }
-      )
-
-      .then(
-        (response) => {
-
-          /*
-           * Backend /api/sales
-           * mengembalikan:
-           *
-           * {
-           *   range,
-           *   rows: [...]
-           * }
-           */
-
-          const salesRows =
-            Array.isArray(
-              response.data?.rows
-            )
-              ? response.data.rows
-              : [];
-
-
-          setRows(
-            salesRows.map(
-              (order) => ({
-
-                id:
-                  order.id ||
-                  order.orderId ||
-                  null,
-
-                orderCode:
-                  order.orderCode ||
-                  order.order_code ||
-                  '-',
-
-                orderedAt:
-                  order.orderedAt ||
-                  order.ordered_at ||
-                  null,
-
-                channel:
-                  order.channel ||
-                  order.sales_channel ||
-                  'website',
-
-                status:
-                  order.status ||
-                  'completed',
-
-                total:
-                  Number(
-                    order.total ||
-                    0
-                  )
-
-              })
-            )
-          );
-
-        }
-      )
-
-      .catch(
-        (e) => {
-
-          console.error(
-            'Gagal memuat penjualan:',
-            e
-          );
-
-
-          setError(
-            e?.response
-              ?.data
-              ?.error ||
-
-            e?.message ||
-
-            'Gagal memuat data penjualan.'
-          );
-
-        }
-      );
-
+      .get('/dashboard', { params: { range } })
+      .then((r) => setData(r.data))
+      .catch((e) => setError(e?.response?.data?.error || 'Gagal memuat ringkasan dashboard.'));
   }, [range]);
 
+  if (error) return <ErrorState message={error} />;
+  if (!data) return <LoadingPage />;
 
-  if (error) {
+  const s = data.summary || {};
+  const grossSales = Number(s.grossSales || 0);
+  const netSales = Number(s.netSales || 0);
+  const expenseTotal = Number(s.expenseTotal || 0);
+  const netProfit = Number(s.netProfit || 0);
+  const transactionCount = Number(s.transactionCount || 0);
+  const marginPercent = grossSales > 0 ? ((netProfit / grossSales) * 100).toFixed(1) : '0.0';
 
-    return (
-      <ErrorState
-        message={error}
-      />
-    );
-
-  }
-
-
-  if (!rows) {
-
-    return (
-      <LoadingPage />
-    );
-
-  }
-
-
-  const totalRevenue =
-    rows.reduce(
-      (
-        sum,
-        row
-      ) =>
-
-        sum +
-        Number(
-          row.total ||
-          0
-        ),
-
-      0
-    );
-
-
-  const average =
-    rows.length
-      ? totalRevenue /
-        rows.length
-      : 0;
-
+  const channelData = s.channel || {};
+  const channelTotalSum = Object.values(channelData).reduce((a, b) => a + Number(b || 0), 0) || 1;
 
   return (
     <>
+      {/* EXECUTIVE GREETING BANNER */}
+      <section className="dashboard-greeting">
+        <div className="dashboard-greeting-main">
+          <div className="dashboard-greeting-label">
+            <span className="greeting-time">{greeting}</span>
+            <span className="greeting-divider">•</span>
+            <span className="greeting-status">Portal Eksekutif Aktif</span>
+          </div>
+          <h2>{ownerName}</h2>
+          <p>Berikut adalah ringkasan kinerja penjualan, alokasi biaya, dan profitabilitas Dapoersari untuk periode terpilih.</p>
+        </div>
+        <div className="dashboard-greeting-actions">
+          <button type="button" className="greeting-btn secondary" onClick={() => navigate('/laporan')}>
+            <FileText size={15} />
+            <span>Buka Laporan</span>
+          </button>
+          <button type="button" className="greeting-btn primary" onClick={() => navigate('/pengeluaran')}>
+            <Plus size={15} />
+            <span>Catat Pengeluaran</span>
+          </button>
+        </div>
+      </section>
 
+      {/* PAGE HEADER & RANGE FILTER */}
       <PageHeader
-
-        eyebrow="
-          KINERJA PENJUALAN
-        "
-
-        title="Penjualan"
-
-        subtitle="
-          Pantau seluruh transaksi
-          dari Project 1 berdasarkan
-          periode yang dipilih.
-        "
-
-        action={
-
-          <RangeSelect
-
-            value={
-              range
-            }
-
-            onChange={
-              setRange
-            }
-
-          />
-
-        }
-
+        eyebrow="IKHTISAR KEUANGAN"
+        title="Ringkasan Kinerja Bisnis"
+        subtitle="Analisis real-time omzet kotor, potongan platform, pengeluaran operasional, dan laba bersih."
+        action={<RangeSelect value={range} onChange={setRange} />}
       />
 
-
-      {/* =================================================
-          RINGKASAN PENJUALAN
-      ================================================= */}
-
-      <div
-        className="
-          finance-grid
-        "
-      >
-
-        <div
-          className="
-            finance-summary
-          "
-        >
-
-          <div
-            className="
-              finance-summary-icon
-            "
-          >
-
-            <Receipt
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <span>
-              Total Penjualan
-            </span>
-
-
-            <strong>
-
-              {money(
-                totalRevenue
-              )}
-
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <div
-          className="
-            finance-summary
-          "
-        >
-
-          <div
-            className="
-              finance-summary-icon
-            "
-          >
-
-            <ShoppingBag
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <span>
-              Transaksi Selesai
-            </span>
-
-
-            <strong>
-
-              {
-                rows.length
-              }
-
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <div
-          className="
-            finance-summary
-          "
-        >
-
-          <div
-            className="
-              finance-summary-icon
-            "
-          >
-
-            <CircleDollarSign
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <span>
-              Rata-rata Transaksi
-            </span>
-
-
-            <strong>
-
-              {money(
-                average
-              )}
-
-            </strong>
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      {/* =================================================
-          DAFTAR TRANSAKSI
-      ================================================= */}
-
-      <div
-        className="
-          table-panel
-        "
-      >
-
-        <div
-          className="
-            table-head
-          "
-        >
-
-          <div>
-
-            <strong>
-              Daftar Transaksi
-            </strong>
-
-
-            <span>
-
-              {
-                rows.length
-              }
-
-              {' '}
-
-              transaksi selesai
-
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div
-          className="
-            table-scroll
-          "
-        >
-
-          <table>
-
-            <thead>
-
-              <tr>
-
-                <th>
-                  Kode
-                </th>
-
-
-                <th>
-                  Tanggal
-                </th>
-
-
-                <th>
-                  Kategori
-                </th>
-
-
-                <th>
-                  Status
-                </th>
-
-
-                <th
-                  className="
-                    right
-                  "
-                >
-                  Total
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-              {rows.map(
-                (row) => (
-                  <tr
-                    key={`${row.orderCode}-${row.orderedAt}`}
-                    className="transaction-row"
-                    onClick={() => {
-                      if (!row.id) {
-                        alert(
-                          'ID transaksi tidak tersedia.'
-                        );
-                        return;
-                      }
-
-                      openOrderDetail(row);
-
-                    }}
-                  >
-                    <td>
-                      <strong>
-                        {
-                          row.orderCode
-                        }
-                      </strong>
-                    </td>
-
-                    <td>
-
-                      {
-                        row.orderedAt
-                          ? new Date(
-                              row.orderedAt
-                            ).toLocaleString(
-                              'id-ID'
-                            )
-                          : '-'
-                      }
-
-                    </td>
-
-
-                    <td>
-
-                      <ChannelBadge
-
-                        channel={
-                          row.channel
-                        }
-
-                      />
-
-                    </td>
-
-
-                    <td>
-
-                      <span
-                        className="
-                          status-badge
-                          done
-                        "
-                      >
-
-                        Selesai
-
-                      </span>
-
-                    </td>
-
-
-                    <td
-                      className="
-                        right
-                      "
-                    >
-
-                      <strong>
-
-                        {
-                          money(
-                            row.total
-                          )
-                        }
-
-                      </strong>
-
-                    </td>
-
-                  </tr>
-
-                )
-
-              )}
-
-
-              {rows.length === 0 && (
-
-                <tr>
-
-                  <td
-                    colSpan="5"
-                    className="
-                      empty-cell
-                    "
-                  >
-
-                    Belum ada transaksi
-                    selesai pada periode ini.
-
-                  </td>
-
-                </tr>
-
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-      {selectedOrder && (
-
-        <OrderDetailModal
-          order={selectedOrder}
-          loading={detailLoading}
-          onClose={() =>
-            setSelectedOrder(null)
-          }
+      {/* METRICS GRID */}
+      <div className="metric-grid">
+        <Metric
+          label="Penjualan Kotor (Gross)"
+          value={shortMoney(grossSales)}
+          sub={`${transactionCount} transaksi berhasil`}
+          icon={<CircleDollarSign size={20} />}
+          positive={true}
         />
+        <Metric
+          label="Penjualan Bersih (Net Sales)"
+          value={shortMoney(netSales)}
+          sub={`Setelah potongan platform ${money(s.platformDeduction || 0)}`}
+          icon={<TrendingUp size={20} />}
+          positive={true}
+        />
+        <Metric
+          label="Pengeluaran Operasional"
+          value={shortMoney(expenseTotal)}
+          sub={`${data.expenseCount || 0} pos pengeluaran tercatat`}
+          icon={<WalletCards size={20} />}
+          positive={false}
+        />
+        <Metric
+          label="Laba Bersih (Net Profit)"
+          value={shortMoney(netProfit)}
+          sub={`${marginPercent}% margin profitabilitas`}
+          icon={<Target size={20} />}
+          positive={netProfit >= 0}
+        />
+      </div>
 
-      )}
+      {/* CHARTS & CHANNEL BREAKDOWN */}
+      <div className="two-col-grid">
+        <Panel
+          title="Tren Arus Pendapatan"
+          hint={`Fluktuasi penjualan harian (${range === 'today' ? 'Hari ini' : range})`}
+          action={
+            <div className="chart-legend">
+              <span className="legend-item">
+                <span className="legend-dot gross" />
+                <span>Penjualan</span>
+              </span>
+            </div>
+          }
+        >
+          <div className="chart-box">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={data.trend || []} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="salesGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.35} />
+                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} strokeDasharray="3 3" stroke="#e2e8f0" />
+                <XAxis dataKey="date" tickFormatter={dateLabel} tickLine={false} axisLine={false} fontSize={11} stroke="#94a3b8" />
+                <YAxis tickFormatter={shortMoney} tickLine={false} axisLine={false} fontSize={11} stroke="#94a3b8" />
+                <Tooltip
+                  formatter={(v) => [money(v), 'Penjualan']}
+                  labelFormatter={(l) =>
+                    new Date(l).toLocaleDateString('id-ID', {
+                      weekday: 'long',
+                      day: 'numeric',
+                      month: 'long',
+                      year: 'numeric'
+                    })
+                  }
+                  contentStyle={{
+                    backgroundColor: '#0f172a',
+                    borderColor: '#1e293b',
+                    borderRadius: '10px',
+                    color: '#fff',
+                    boxShadow: '0 10px 25px rgba(0,0,0,0.2)'
+                  }}
+                  itemStyle={{ color: '#a5b4fc', fontWeight: 600 }}
+                  labelStyle={{ color: '#94a3b8', fontSize: '11px', marginBottom: '4px' }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="sales"
+                  stroke="#4f46e5"
+                  strokeWidth={2.5}
+                  fillOpacity={1}
+                  fill="url(#salesGradient)"
+                  animationDuration={900}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </Panel>
 
+        <Panel title="Kontribusi Channel Penjualan" hint="Distribusi omzet kotor per platform">
+          <div className="channel-distribution-list">
+            {Object.entries(channelData).map(([key, val]) => {
+              const amount = Number(val || 0);
+              const percent = ((amount / channelTotalSum) * 100).toFixed(1);
+              return (
+                <div className="channel-bar-row" key={key}>
+                  <div className="channel-bar-meta">
+                    <div className="channel-bar-label">
+                      <span className={`channel-indicator ${key}`} />
+                      <strong>{channelLabel(key)}</strong>
+                    </div>
+                    <div className="channel-bar-amounts">
+                      <strong>{money(amount)}</strong>
+                      <span className="channel-bar-pct">{percent}%</span>
+                    </div>
+                  </div>
+                  <div className="channel-progress-track">
+                    <div className={`channel-progress-fill ${key}`} style={{ width: `${Math.max(4, percent)}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="platform-deduction-card">
+            <div className="deduction-left">
+              <div className="deduction-icon">
+                <Percent size={18} />
+              </div>
+              <div>
+                <span>Potongan ShopeeFood</span>
+                <strong>{money(s.platformDeduction || 0)}</strong>
+              </div>
+            </div>
+            <span className="deduction-tag">Biaya Komisi Platform</span>
+          </div>
+        </Panel>
+      </div>
+
+      {/* EXECUTIVE ADVISOR INSIGHT STRIP */}
+      <div className="insight-strip">
+        <div className="insight-icon">
+          <Sparkles size={20} />
+        </div>
+        <div className="insight-content">
+          <strong>Executive Business Intelligence</strong>
+          <span>
+            {transactionCount > 0
+              ? `Periode ini membukukan ${transactionCount} transaksi dengan rata-rata omzet ${money(grossSales / transactionCount)} per pesanan. Laba bersih mencapai ${money(netProfit)} (${marginPercent}% margin). Gunakan tab Performa Toko untuk melihat menu terlaris dan jam sibuk.`
+              : 'Belum ada transaksi pada rentang waktu ini. Ubah filter periode di atas untuk meninjau data historis usaha.'}
+          </span>
+        </div>
+      </div>
     </>
   );
 }
 
-// =========================================================
-// OrderDetailModal //
+/* =========================================================
+   3. SALES COMPONENT (PENJUALAN)
+   ========================================================= */
+function Sales() {
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [range, setRange] = useRange('30d');
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [channelFilter, setChannelFilter] = useState('all');
 
-function OrderDetailModal({
-  order,
-  loading,
-  onClose
-}) {
+  const openOrderDetail = async (order) => {
+    setDetailLoading(true);
+    try {
+      const response = await api.get(`/sales/${order.id}`);
+      setSelectedOrder(response.data);
+    } catch (e) {
+      console.error('Gagal memuat detail transaksi:', e);
+      alert(e?.response?.data?.error || 'Detail transaksi gagal dimuat.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    setRows(null);
+    setError('');
+    api
+      .get('/sales', { params: { range } })
+      .then((response) => {
+        const salesRows = Array.isArray(response.data?.rows) ? response.data.rows : [];
+        setRows(
+          salesRows.map((order) => ({
+            id: order.id || order.orderId || null,
+            orderCode: order.orderCode || order.order_code || '-',
+            orderedAt: order.orderedAt || order.ordered_at || null,
+            channel: order.channel || order.sales_channel || 'website',
+            status: order.status || 'completed',
+            total: Number(order.total || 0)
+          }))
+        );
+      })
+      .catch((e) => {
+        console.error('Gagal memuat penjualan:', e);
+        setError(e?.response?.data?.error || e?.message || 'Gagal memuat data penjualan.');
+      });
+  }, [range]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!rows) return <LoadingPage />;
+
+  const filteredRows = rows.filter((row) => {
+    const matchesSearch = row.orderCode.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesChannel = channelFilter === 'all' || row.channel.toLowerCase() === channelFilter.toLowerCase();
+    return matchesSearch && matchesChannel;
+  });
+
+  const totalRevenue = rows.reduce((sum, row) => sum + Number(row.total || 0), 0);
+  const average = rows.length ? totalRevenue / rows.length : 0;
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="REKAP TRANSAKSI"
+        title="Penjualan & Kasir"
+        subtitle="Daftar seluruh transaksi yang terselesaikan dari seluruh channel penjualan Dapoersari."
+        action={<RangeSelect value={range} onChange={setRange} />}
+      />
+
+      {/* FINANCE SUMMARY CARDS */}
+      <div className="finance-grid">
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <Receipt size={20} />
+          </div>
+          <div>
+            <span>Total Omzet Penjualan</span>
+            <strong>{money(totalRevenue)}</strong>
+          </div>
+        </div>
+
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <ShoppingBag size={20} />
+          </div>
+          <div>
+            <span>Total Transaksi Selesai</span>
+            <strong>{rows.length} Pesanan</strong>
+          </div>
+        </div>
+
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <CircleDollarSign size={20} />
+          </div>
+          <div>
+            <span>Rata-rata Nilai Pesanan</span>
+            <strong>{money(average)}</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* TABLE PANEL */}
+      <div className="table-panel">
+        <div className="table-toolbar">
+          <div className="table-search-box">
+            <Search size={15} />
+            <input
+              type="text"
+              placeholder="Cari kode transaksi (cth: ORD-...)"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          <div className="table-filter-group">
+            <Filter size={15} />
+            <select value={channelFilter} onChange={(e) => setChannelFilter(e.target.value)}>
+              <option value="all">Semua Channel</option>
+              <option value="website">Website Online</option>
+              <option value="offline">Offline POS</option>
+              <option value="shopeefood">ShopeeFood</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="table-head">
+          <div>
+            <strong>Daftar Riwayat Transaksi</strong>
+            <span>
+              Menampilkan {filteredRows.length} dari total {rows.length} transaksi selesai
+            </span>
+          </div>
+        </div>
+
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Kode Pesanan</th>
+                <th>Waktu Transaksi</th>
+                <th>Channel Penjualan</th>
+                <th>Status</th>
+                <th className="right">Nominal Transaksi</th>
+                <th className="right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRows.map((row) => (
+                <tr key={`${row.orderCode}-${row.orderedAt}`} className="transaction-row" onClick={() => openOrderDetail(row)}>
+                  <td>
+                    <span className="order-code-badge">{row.orderCode}</span>
+                  </td>
+                  <td>
+                    <span className="text-muted">{formatDateTime(row.orderedAt)}</span>
+                  </td>
+                  <td>
+                    <ChannelBadge channel={row.channel} />
+                  </td>
+                  <td>
+                    <span className="status-badge done">
+                      <CheckCircle2 size={12} />
+                      <span>Selesai</span>
+                    </span>
+                  </td>
+                  <td className="right">
+                    <strong className="amount-cell">{money(row.total)}</strong>
+                  </td>
+                  <td className="right">
+                    <button
+                      type="button"
+                      className="table-action-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openOrderDetail(row);
+                      }}
+                    >
+                      <span>Detail</span>
+                      <ChevronRight size={14} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {filteredRows.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="empty-cell">
+                    <div className="empty-state">
+                      <Receipt size={32} />
+                      <strong>Tidak ada transaksi yang cocok</strong>
+                      <span>Coba ganti kata kunci pencarian atau ubah filter channel di atas.</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* ORDER DETAIL DRAWER/MODAL */}
+      {selectedOrder && (
+        <OrderDetailModal order={selectedOrder} loading={detailLoading} onClose={() => setSelectedOrder(null)} />
+      )}
+    </>
+  );
+}
+
+/* =========================================================
+   ORDER DETAIL MODAL (DIGITAL RECEIPT)
+   ========================================================= */
+function OrderDetailModal({ order, loading, onClose }) {
+  const [copied, setCopied] = useState(false);
 
   if (loading) {
     return (
       <div className="modal-backdrop">
-
         <div className="modal-card">
-
           <div className="loading-page">
             <div className="spinner" />
-
-            <span>
-              Memuat detail transaksi...
-            </span>
+            <span>Memuat rincian invoice transaksi...</span>
           </div>
-
         </div>
-
       </div>
     );
   }
 
+  const channel = order?.sales_channel || order?.channel || 'website';
+  const gross = Number(order?.total || 0);
+  const platformRate = channel === 'shopeefood' ? 0.25 : 0;
+  const platformFee = gross * platformRate;
+  const netSales = gross - platformFee;
+  const items = Array.isArray(order?.order_items) ? order.order_items : [];
 
-  const channel =
-    order?.sales_channel ||
-    order?.channel ||
-    'website';
-
-
-  const gross =
-    Number(
-      order?.total ||
-      0
-    );
-
-
-  const platformRate =
-    channel === 'shopeefood'
-      ? 0.25
-      : 0;
-
-
-  const platformFee =
-    gross *
-    platformRate;
-
-
-  const netSales =
-    gross -
-    platformFee;
-
-
-  const items =
-    Array.isArray(
-      order?.order_items
-    )
-      ? order.order_items
-      : [];
-
+  const copyOrderCode = () => {
+    if (order?.order_code) {
+      navigator.clipboard.writeText(order.order_code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
-
-    <div
-      className="
-        modal-backdrop
-      "
-      onClick={onClose}
-    >
-
-      <div
-        className="
-          modal-card
-          order-detail-modal
-        "
-        onClick={(e) =>
-          e.stopPropagation()
-        }
-      >
-
+    <div className="modal-backdrop" onClick={onClose}>
+      <div className="order-detail-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-head">
-
           <div>
-
-            <span
-              className="
-                eyebrow
-                dark
-              "
-            >
-              DETAIL TRANSAKSI
-            </span>
-
-            <h3>
-              {
-                order?.order_code ||
-                '-'
-              }
-            </h3>
-
+            <span className="eyebrow">RINCIAN INVOICE PESANAN</span>
+            <div className="order-code-title-row">
+              <h3>{order?.order_code || '-'}</h3>
+              <button type="button" className="copy-btn" onClick={copyOrderCode} title="Salin kode pesanan">
+                {copied ? <Check size={14} className="text-green" /> : <Copy size={14} />}
+                <span>{copied ? 'Tersalin' : 'Salin'}</span>
+              </button>
+            </div>
           </div>
-
-
-          <button
-            type="button"
-            className="ghost-icon"
-            onClick={onClose}
-          >
-
-            <X
-              size={18}
-            />
-
+          <button type="button" className="ghost-icon" onClick={onClose} aria-label="Tutup">
+            <X size={18} />
           </button>
-
         </div>
 
-
-        {/* INFORMASI UTAMA */}
-
+        {/* ORDER INFO GRID */}
         <div className="order-detail-info">
-
           <div>
-
-            <span>
-              Kode Pesanan
-            </span>
-
-            <strong>
-              {
-                order?.order_code ||
-                '-'
-              }
-            </strong>
-
+            <span>WAKTU PEMESANAN</span>
+            <strong>{formatDateTime(order?.ordered_at)}</strong>
           </div>
-
-
           <div>
-
-            <span>
-              Tanggal
-            </span>
-
-            <strong>
-
-              {
-                order?.ordered_at
-                  ? new Date(
-                      order.ordered_at
-                    ).toLocaleString(
-                      'id-ID',
-                      {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }
-                    )
-                  : '-'
-              }
-
-            </strong>
-
+            <span>CHANNEL PENJUALAN</span>
+            <ChannelBadge channel={channel} />
           </div>
-
-
           <div>
-
-            <span>
-              Channel
+            <span>STATUS TRANSAKSI</span>
+            <span className="status-badge done">
+              <CheckCircle2 size={12} />
+              <span>Selesai & Lunas</span>
             </span>
-
-            <strong>
-              {
-                channel ===
-                'shopeefood'
-                  ? 'ShopeeFood'
-                  : channel ===
-                    'offline'
-                  ? 'Offline'
-                  : 'Website'
-              }
-            </strong>
-
           </div>
-
-
           <div>
-
-            <span>
-              Metode Pembayaran
-            </span>
-
-            <strong>
-              {
-                (
-                  order?.payment_method ||
-                  '-'
-                ).toUpperCase()
-              }
-            </strong>
-
+            <span>METODE PEMBAYARAN</span>
+            <strong>{(order?.payment_method || 'CASH').toUpperCase()}</strong>
           </div>
-
         </div>
 
-
-        {/* ITEM PESANAN */}
-
+        {/* ORDER ITEMS */}
         <div className="order-detail-section">
-
           <div className="order-detail-section-head">
-
-            <strong>
-              Detail Pesanan
-            </strong>
-
-            <span>
-              {
-                items.length
-              } item
-            </span>
-
+            <strong>Daftar Item Menu ({items.length})</strong>
           </div>
-
 
           <div className="order-item-list">
+            {items.map((item, idx) => {
+              const itemName = item?.menu?.name || item?.name || 'Menu Dapoersari';
+              const quantity = Number(item?.quantity || 1);
+              const unitPrice = Number(item?.unit_price || 0);
+              const subtotal = quantity * unitPrice;
 
-            {items.map(
-              (item) => {
-
-                const itemName =
-                  item?.menu?.name ||
-                  item?.name ||
-                  'Menu';
-
-
-                const quantity =
-                  Number(
-                    item?.quantity ||
-                    0
-                  );
-
-
-                const unitPrice =
-                  Number(
-                    item?.unit_price ||
-                    0
-                  );
-
-
-                const subtotal =
-                  quantity *
-                  unitPrice;
-
-
-                return (
-
-                  <div
-                    className="
-                      order-item-row
-                    "
-                    key={
-                      item.id
-                    }
-                  >
-
-                    <div>
-
-                      <strong>
-                        {
-                          itemName
-                        }
-                      </strong>
-
-                      <span>
-
-                        {quantity}
-
-                        {' × '}
-
-                        {money(
-                          unitPrice
-                        )}
-
-                      </span>
-
-                    </div>
-
-
-                    <strong>
-
-                      {money(
-                        subtotal
-                      )}
-
-                    </strong>
-
+              return (
+                <div className="order-item-row" key={item.id || idx}>
+                  <div className="order-item-main">
+                    <strong>{itemName}</strong>
+                    <span>
+                      {quantity} x {money(unitPrice)}
+                    </span>
                   </div>
+                  <strong className="order-item-total">{money(subtotal)}</strong>
+                </div>
+              );
+            })}
 
-                );
-
-              }
-            )}
-
-
-            {items.length === 0 && (
-
-              <div
-                className="
-                  empty-cell
-                "
-              >
-                Detail item tidak tersedia.
-              </div>
-
-            )}
-
+            {items.length === 0 && <div className="empty-cell">Rincian item menu tidak tercatat.</div>}
           </div>
-
         </div>
 
-
-        {/* RINGKASAN NILAI */}
-
+        {/* SETTLEMENT CARD */}
         <div className="order-total-card">
-
-          <div>
-
-            <span>
-              Penjualan Kotor
-            </span>
-
-            <strong>
-              {money(
-                gross
-              )}
-            </strong>
-
+          <div className="total-row">
+            <span>Subtotal Penjualan Kotor</span>
+            <strong>{money(gross)}</strong>
           </div>
-
-
-          <div>
-
-            <span>
-              Potongan Platform
-              {
-                platformRate > 0
-                  ? ` (${platformRate * 100}%)`
-                  : ''
-              }
-            </span>
-
-            <strong>
-              {money(
-                platformFee
-              )}
-            </strong>
-
+          {platformRate > 0 && (
+            <div className="total-row deduction">
+              <span>Potongan Komisi ShopeeFood (25%)</span>
+              <strong>- {money(platformFee)}</strong>
+            </div>
+          )}
+          <div className="total-row net">
+            <span>Pendapatan Bersih (Net Settlement)</span>
+            <strong>{money(netSales)}</strong>
           </div>
-
-
-          <div className="net">
-
-            <span>
-              Penjualan Bersih
-            </span>
-
-            <strong>
-              {money(
-                netSales
-              )}
-            </strong>
-
-          </div>
-
         </div>
 
+        <div className="modal-footer-actions">
+          <button type="button" className="secondary-btn" onClick={onClose}>
+            Tutup
+          </button>
+        </div>
       </div>
-
     </div>
   );
 }
 
-// =========================================================
-// ChannelBadge //
-
-function ChannelBadge({
-  channel
-}) {
-
-  return (
-    <span
-      className={
-        `channel-badge ${
-          channel ||
-          'website'
-        }`
-      }
-    >
-
-      {channelLabel(
-        channel
-      )}
-
-    </span>
-  );
-}
-
-
-function channelLabel(
-  c
-) {
-
-  return (
-    {
-      website:
-        'Website',
-
-      offline:
-        'Offline',
-
-      shopeefood:
-        'ShopeeFood'
-
-    }[c] ||
-    c ||
-    'Website'
-  );
-}
-
-
 /* =========================================================
-   FINANCE
+   4. FINANCE COMPONENT (PENGELUARAN / OPEX)
    ========================================================= */
-
 function Finance() {
+  const [expenses, setExpenses] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [modal, setModal] = useState(false);
+  const [error, setError] = useState('');
 
-  const [
-    expenses,
-    setExpenses
-  ] = useState(null);
+  const loadExpenses = async () => {
+    const response = await api.get('/expenses');
+    const rawData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+    const normalized = rawData.map((expense) => ({
+      id: expense.id,
+      categoryId: expense.categoryId ?? expense.expense_category_id ?? null,
+      categoryName: expense.categoryName || expense.category || expense.expense_categories?.name || 'Operasional',
+      amount: Number(expense.amount || 0),
+      expenseDate: expense.expenseDate || expense.spent_at || expense.expense_date || expense.created_at || null,
+      note: expense.note || expense.title || expense.notes || expense.description || 'Pengeluaran Operasional',
+      createdAt: expense.createdAt || expense.created_at || null
+    }));
+    setExpenses(normalized);
+  };
 
-  const [
-    categories,
-    setCategories
-  ] = useState([]);
-
-  const [
-    modal,
-    setModal
-  ] = useState(false);
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
-
-  /* =====================================================
-     LOAD EXPENSES
-  ===================================================== */
-
-  const loadExpenses =
-    async () => {
-
-      const response =
-        await api.get(
-          '/expenses'
-        );
-
-      const rawData =
-        Array.isArray(
-          response.data
-        )
-          ? response.data
-          : (
-              Array.isArray(
-                response.data?.data
-              )
-                ? response.data.data
-                : []
-            );
-
-
-      /*
-       * NORMALISASI DATA
-       *
-       * Support format backend:
-       * expenseDate / spent_at
-       * categoryName / category
-       * note / title / notes
-       */
-
-      const normalized =
-        rawData.map(
-          (expense) => {
-
-            return {
-
-              id:
-                expense.id,
-
-              categoryId:
-                expense.categoryId ??
-                expense.expense_category_id ??
-                null,
-
-              categoryName:
-                expense.categoryName ||
-                expense.category ||
-                expense.expense_categories?.name ||
-                'Tanpa kategori',
-
-              amount:
-                Number(
-                  expense.amount ||
-                  0
-                ),
-
-              expenseDate:
-                expense.expenseDate ||
-                expense.spent_at ||
-                expense.expense_date ||
-                expense.created_at ||
-                null,
-
-              note:
-                expense.note ||
-                expense.title ||
-                expense.notes ||
-                expense.description ||
-                'Pengeluaran',
-
-              createdAt:
-                expense.createdAt ||
-                expense.created_at ||
-                null
-
-            };
-
-          }
-        );
-
-
-      setExpenses(
-        normalized
-      );
-
-    };
-
-
-  /* =====================================================
-     LOAD CATEGORIES
-  ===================================================== */
-
-  const loadCategories =
-  async () => {
-
+  const loadCategories = async () => {
     try {
-
-      const response =
-        await api.get(
-          '/expense-categories'
-        );
-
-      const rawData =
-        Array.isArray(
-          response.data
-        )
-          ? response.data
-          : (
-              Array.isArray(
-                response.data?.data
-              )
-                ? response.data.data
-                : []
-            );
-
-      console.log(
-        'CATEGORY DATA:',
-        rawData
-      );
-
-      setCategories(
-        rawData
-      );
-
+      const response = await api.get('/expense-categories');
+      const rawData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setCategories(rawData);
     } catch (e) {
-
-      console.error(
-        'Kategori gagal dimuat:',
-        e
-      );
-
-      /*
-       * Fallback jika endpoint/database
-       * sedang bermasalah.
-       */
+      console.error('Kategori gagal dimuat, menggunakan fallback:', e);
       setCategories([
-        {
-          id: 1,
-          name: 'Bahan Baku'
-        },
-        {
-          id: 2,
-          name: 'Operasional'
-        },
-        {
-          id: 3,
-          name: 'Transportasi'
-        },
-        {
-          id: 4,
-          name: 'Listrik'
-        },
-        {
-          id: 5,
-          name: 'Perawatan'
-        },
-        {
-          id: 6,
-          name: 'Lainnya'
-        }
+        { id: 1, name: 'Bahan Baku & Dapur' },
+        { id: 2, name: 'Operasional & Utilitas' },
+        { id: 3, name: 'Transportasi & Logistik' },
+        { id: 4, name: 'Listrik & Air' },
+        { id: 5, name: 'Perawatan Alat' },
+        { id: 6, name: 'Lain-lain' }
       ]);
-
     }
-
   };
 
-
-const openExpenseModal =
-  async () => {
-
+  const openExpenseModal = async () => {
     await loadCategories();
-
     setModal(true);
-
   };
-
-
-  /* =====================================================
-     INITIAL LOAD
-  ===================================================== */
-
- useEffect(() => {
-
-  loadExpenses()
-    .catch((e) => {
-
-      console.error(
-        'Gagal memuat keuangan:',
-        e
-      );
-
-      setError(
-        e?.response?.data?.error ||
-        e?.message ||
-        'Gagal memuat data keuangan.'
-      );
-
-    });
-
-}, []);
-
-
-  /* =====================================================
-     SAVE EXPENSE
-  ===================================================== */
-
-  const save =
-    async (form) => {
-
-      await api.post(
-        '/expenses',
-        {
-
-          categoryId:
-            Number(
-              form.categoryId
-            ),
-
-          amount:
-            Number(
-              form.amount
-            ),
-
-          expenseDate:
-            form.expenseDate,
-
-          note:
-            form.note
-
-        }
-      );
-
-
-      setModal(false);
-
-      await loadExpenses();
-
-    };
-
-
-  /* =====================================================
-     DELETE EXPENSE
-  ===================================================== */
-
-  const remove =
-    async (id) => {
-
-      const confirmed =
-        window.confirm(
-          'Hapus pengeluaran ini?'
-        );
-
-
-      if (!confirmed) {
-        return;
-      }
-
-
-      try {
-
-        await api.delete(
-          `/expenses/${id}`
-        );
-
-
-        await loadExpenses();
-
-
-      } catch (e) {
-
-        console.error(
-          'Gagal menghapus pengeluaran:',
-          e
-        );
-
-
-        alert(
-          e?.response
-            ?.data
-            ?.error ||
-          e?.message ||
-          'Pengeluaran gagal dihapus.'
-        );
-
-      }
-
-    };
-
-
-  /* =====================================================
-     ERROR
-  ===================================================== */
-
-  if (error) {
-
-    return (
-      <ErrorState
-        message={
-          error
-        }
-      />
-    );
-
-  }
-
-
-  /* =====================================================
-     LOADING
-  ===================================================== */
-
-  if (!expenses) {
-
-    return (
-      <LoadingPage />
-    );
-
-  }
-
-
-  /* =====================================================
-     TOTAL EXPENSE
-  ===================================================== */
-
-  const totalExpense =
-    expenses.reduce(
-      (
-        sum,
-        expense
-      ) =>
-
-        sum +
-        Number(
-          expense.amount ||
-          0
-        ),
-
-      0
-    );
-
-
-  /* =====================================================
-     FORMAT DATE
-  ===================================================== */
-
-  const formatExpenseDate =
-    (value) => {
-
-      if (!value) {
-        return '-';
-      }
-
-
-      const date =
-        new Date(
-          value
-        );
-
-
-      if (
-        Number.isNaN(
-          date.getTime()
-        )
-      ) {
-
-        return '-';
-
-      }
-
-
-      return date.toLocaleDateString(
-        'id-ID',
-        {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        }
-      );
-
-    };
-
-
-  /* =====================================================
-     UI
-  ===================================================== */
-
-  return (
-    <>
-
-      <PageHeader
-
-        eyebrow="
-          KEUANGAN USAHA
-        "
-
-        title="Pengeluaran"
-
-        subtitle="
-          Catat dan kendalikan
-          seluruh biaya operasional
-          usaha.
-        "
-
-        action={
-
-          <button
-
-            className="
-              primary-btn
-              small
-            "
-
-            onClick={
-              openExpenseModal
-            }
-
-          >
-
-            <Plus
-              size={17}
-            />
-
-            Tambah Pengeluaran
-
-          </button>
-
-        }
-
-      />
-
-
-      {/* =================================================
-          SUMMARY
-      ================================================= */}
-
-      <div
-        className="
-          finance-grid
-        "
-      >
-
-        <div
-          className="
-            finance-summary
-          "
-        >
-
-          <div
-            className="
-              finance-summary-icon
-            "
-          >
-
-            <WalletCards
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <span>
-              Total Pengeluaran
-            </span>
-
-
-            <strong>
-
-              {money(
-                totalExpense
-              )}
-
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <div
-          className="
-            finance-summary
-          "
-        >
-
-          <div
-            className="
-              finance-summary-icon
-            "
-          >
-
-            <Receipt
-              size={18}
-            />
-
-          </div>
-
-
-          <div>
-
-            <span>
-              Jumlah Catatan
-            </span>
-
-
-            <strong>
-
-              {
-                expenses.length
-              }
-
-            </strong>
-
-          </div>
-
-        </div>
-
-      </div>
-
-
-      {/* =================================================
-          EXPENSE TABLE
-      ================================================= */}
-
-      <div
-        className="
-          table-panel
-        "
-      >
-
-        <div
-          className="
-            table-head
-          "
-        >
-
-          <div>
-
-            <strong>
-              Riwayat Pengeluaran
-            </strong>
-
-
-            <span>
-              Pengeluaran terbaru
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div
-          className="
-            table-scroll
-          "
-        >
-
-          <table>
-
-            <thead>
-
-              <tr>
-
-                <th>
-                  Tanggal
-                </th>
-
-                <th>
-                  Kategori
-                </th>
-
-                <th>
-                  Keterangan
-                </th>
-
-                <th
-                  className="
-                    right
-                  "
-                >
-                  Nominal
-                </th>
-
-                <th>
-                </th>
-
-              </tr>
-
-            </thead>
-
-
-            <tbody>
-
-              {expenses.map(
-                (expense) => (
-
-                  <tr
-                    key={
-                      expense.id
-                    }
-                  >
-
-                    {/* TANGGAL */}
-
-                    <td>
-
-                      {
-                        formatExpenseDate(
-                          expense.expenseDate
-                        )
-                      }
-
-                    </td>
-
-
-                    {/* KATEGORI */}
-
-                    <td>
-
-                      <span
-                        className="
-                          category-chip
-                        "
-                      >
-
-                        {
-                          expense.categoryName ||
-                          'Tanpa kategori'
-                        }
-
-                      </span>
-
-                    </td>
-
-
-                    {/* KETERANGAN */}
-
-                    <td>
-
-                      {
-                        expense.note ||
-                        'Pengeluaran'
-                      }
-
-                    </td>
-
-
-                    {/* NOMINAL */}
-
-                    <td
-                      className="
-                        right
-                      "
-                    >
-
-                      <strong>
-
-                        {money(
-                          expense.amount
-                        )}
-
-                      </strong>
-
-                    </td>
-
-
-                    {/* DELETE */}
-
-                    <td
-                      className="
-                        actions-cell
-                      "
-                    >
-
-                      <button
-
-                        type="button"
-
-                        className="
-                          ghost-icon
-                          danger
-                        "
-
-                        onClick={() =>
-                          remove(
-                            expense.id
-                          )
-                        }
-
-                        aria-label="
-                          Hapus pengeluaran
-                        "
-
-                      >
-
-                        <Trash2
-                          size={15}
-                        />
-
-                      </button>
-
-                    </td>
-
-                  </tr>
-
-                )
-              )}
-
-
-              {/* EMPTY */}
-
-              {expenses.length === 0 && (
-
-                <tr>
-
-                  <td
-                    colSpan="5"
-                    className="
-                      empty-cell
-                    "
-                  >
-
-                    Belum ada
-                    pengeluaran.
-
-                  </td>
-
-                </tr>
-
-              )}
-
-            </tbody>
-
-          </table>
-
-        </div>
-
-      </div>
-
-
-      {/* =================================================
-          MODAL
-      ================================================= */}
-
-      {modal && (
-
-        <ExpenseModal
-
-          categories={
-            categories
-          }
-
-          onClose={() =>
-            setModal(false)
-          }
-
-          onSave={
-            save
-          }
-
-        />
-
-      )}
-
-    </>
-  );
-}
-
-
-/* =========================================================
-   EXPENSE MODAL
-   ========================================================= */
-
-function ExpenseModal({
-  categories,
-  onClose,
-  onSave
-}) {
-
-  const [
-    form,
-    setForm
-  ] = useState({
-
-    categoryId:
-      categories[0]?.id ||
-      '',
-
-    amount:
-      '',
-
-    expenseDate:
-      new Date()
-        .toISOString()
-        .slice(
-          0,
-          10
-        ),
-
-    note:
-      ''
-
-  });
-
-
-  const [
-    saving,
-    setSaving
-  ] = useState(false);
-
-
-  const submit =
-    async (e) => {
-
-      e.preventDefault();
-
-      if (
-        !form.categoryId
-      ) {
-
-        alert(
-          'Pilih kategori pengeluaran.'
-        );
-
-        return;
-
-      }
-
-
-      if (
-        Number(
-          form.amount
-        ) <= 0
-      ) {
-
-        alert(
-          'Nominal harus lebih dari 0.'
-        );
-
-        return;
-
-      }
-
-
-      setSaving(true);
-
-      try {
-
-        await onSave(
-          form
-        );
-
-      } catch (e) {
-
-        alert(
-          e?.response
-            ?.data
-            ?.error ||
-          'Gagal menyimpan pengeluaran.'
-        );
-
-      } finally {
-
-        setSaving(false);
-
-      }
-
-    };
-
-
-  return (
-
-    <div
-      className="
-        modal-backdrop
-      "
-    >
-
-      <form
-        className="
-          modal-card
-        "
-
-        onSubmit={
-          submit
-        }
-      >
-
-        <div
-          className="
-            modal-head
-          "
-        >
-
-          <div>
-
-            <span
-              className="
-                eyebrow
-                dark
-              "
-            >
-              PENCATATAN KEUANGAN
-            </span>
-
-            <h3>
-              Tambah Pengeluaran
-            </h3>
-
-          </div>
-
-
-          <button
-            type="button"
-            className="
-              ghost-icon
-            "
-            onClick={
-              onClose
-            }
-          >
-
-            <X
-              size={18}
-            />
-
-          </button>
-
-        </div>
-
-
-        <div
-          className="
-            form-grid
-          "
-        >
-
-          <label>
-
-            Tanggal
-
-            <input
-              type="date"
-
-              value={
-                form.expenseDate
-              }
-
-              onChange={
-                (e) =>
-                  setForm({
-                    ...form,
-                    expenseDate:
-                      e.target.value
-                  })
-              }
-
-              required
-            />
-
-          </label>
-
-
-          <label>
-
-            Kategori
-
-            <select
-              value={
-                form.categoryId
-              }
-
-              onChange={
-                (e) =>
-                  setForm({
-                    ...form,
-                    categoryId:
-                      e.target.value
-                  })
-              }
-
-              required
-            >
-
-              <option value="">
-                Pilih kategori
-              </option>
-
-              {categories.map(
-                (category) => (
-
-                  <option
-                    key={
-                      category.id
-                    }
-
-                    value={
-                      category.id
-                    }
-                  >
-
-                    {
-                      category.name
-                    }
-
-                  </option>
-
-                )
-              )}
-
-            </select>
-
-          </label>
-
-
-          <label
-            className="full"
-          >
-
-            Keterangan
-
-            <input
-              value={
-                form.note
-              }
-
-              onChange={
-                (e) =>
-                  setForm({
-                    ...form,
-                    note:
-                      e.target.value
-                  })
-              }
-
-              placeholder="
-                Contoh: Restock ayam 10 kg
-              "
-
-              required
-            />
-
-          </label>
-
-
-          <label
-            className="full"
-          >
-
-            Nominal
-
-            <input
-              type="number"
-
-              min="0"
-
-              value={
-                form.amount
-              }
-
-              onChange={
-                (e) =>
-                  setForm({
-                    ...form,
-                    amount:
-                      e.target.value
-                  })
-              }
-
-              placeholder="0"
-
-              required
-            />
-
-          </label>
-
-        </div>
-
-
-        <div
-          className="
-            modal-actions
-          "
-        >
-
-          <button
-            type="button"
-            className="
-              secondary-btn
-            "
-            onClick={
-              onClose
-            }
-          >
-            Batal
-          </button>
-
-
-          <button
-            className="
-              primary-btn
-            "
-            disabled={
-              saving
-            }
-          >
-
-            {saving
-              ? 'Menyimpan...'
-              : 'Simpan Pengeluaran'}
-
-          </button>
-
-        </div>
-
-      </form>
-
-    </div>
-
-  );
-}
-
-
-/* =========================================================
-   ANALYTICS
-   ========================================================= */
-
-function Analytics() {
-
-  const [
-    range,
-    setRange
-  ] = useRange('30d');
-
-
-  const [
-    data,
-    setData
-  ] = useState(null);
-
-
-  const [
-    recommendationData,
-    setRecommendationData
-  ] = useState(null);
-
-
-  const [
-    error,
-    setError
-  ] = useState('');
-
 
   useEffect(() => {
+    loadExpenses().catch((e) => {
+      console.error('Gagal memuat keuangan:', e);
+      setError(e?.response?.data?.error || e?.message || 'Gagal memuat data keuangan.');
+    });
+  }, []);
 
-    let active = true;
+  const save = async (form) => {
+    await api.post('/expenses', {
+      categoryId: Number(form.categoryId),
+      amount: Number(form.amount),
+      expenseDate: form.expenseDate,
+      note: form.note
+    });
+    setModal(false);
+    await loadExpenses();
+  };
 
-    setError('');
-    setData(null);
-    setRecommendationData(
-      null
-    );
+  const remove = async (id) => {
+    const confirmed = window.confirm('Apakah Anda yakin ingin menghapus catatan pengeluaran ini?');
+    if (!confirmed) return;
+    try {
+      await api.delete(`/expenses/${id}`);
+      await loadExpenses();
+    } catch (e) {
+      console.error('Gagal menghapus pengeluaran:', e);
+      alert(e?.response?.data?.error || e?.message || 'Pengeluaran gagal dihapus.');
+    }
+  };
 
+  if (error) return <ErrorState message={error} />;
+  if (!expenses) return <LoadingPage />;
 
-    Promise.all([
+  const totalExpense = expenses.reduce((sum, e) => sum + Number(e.amount || 0), 0);
+  const avgExpense = expenses.length ? totalExpense / expenses.length : 0;
 
-      api.get(
-        '/analytics',
-        {
-          params: {
-            range
-          }
-        }
-      ),
-
-      api.get(
-        '/recommendations',
-        {
-          params: {
-            range
-          }
-        }
-      )
-
-    ])
-
-      .then(
-        ([
-          analyticsResponse,
-          recommendationResponse
-        ]) => {
-
-          if (!active) {
-            return;
-          }
-
-
-          setData(
-            analyticsResponse.data
-          );
-
-
-          setRecommendationData(
-            recommendationResponse.data
-          );
-
-        }
-      )
-
-      .catch(
-        (e) => {
-
-          if (!active) {
-            return;
-          }
-
-
-          console.error(
-            'Gagal memuat performa toko:',
-            e
-          );
-
-
-          setError(
-            e?.response
-              ?.data
-              ?.error ||
-            'Gagal memuat data performa toko.'
-          );
-
-        }
-      );
-
-
-    return () => {
-
-      active = false;
-
-    };
-
-  }, [range]);
-
-
-  if (error) {
-
-    return (
-      <ErrorState
-        message={error}
-      />
-    );
-
-  }
-
-
-  if (
-    !data ||
-    !recommendationData
-  ) {
-
-    return (
-      <LoadingPage />
-    );
-
-  }
-
-
-  const channelPalette = [
-    '#122338',
-    '#9A7B4D',
-    '#6D7D90'
-  ];
-
-
-  const iconForRecommendation =
-    (type) => {
-
-      if (
-        type ===
-        'product'
-      ) {
-
-        return (
-          <PackageSearch
-            size={18}
-          />
-        );
-
-      }
-
-
-      if (
-        type ===
-        'margin'
-      ) {
-
-        return (
-          <Percent
-            size={18}
-          />
-        );
-
-      }
-
-
-      return (
-        <TrendingUp
-          size={18}
-        />
-      );
-
-    };
-
+  const formatExpenseDate = (value) => {
+    if (!value) return '-';
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return '-';
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
 
   return (
     <>
-
       <PageHeader
-        eyebrow="PERFORMA BISNIS"
-        title="Performa Toko"
-        subtitle="Pantau perkembangan penjualan, produk, kategori penjualan, dan aktivitas toko."
+        eyebrow="ARUS KAS KELUAR"
+        title="Pengeluaran Operasional (OpEx)"
+        subtitle="Catat dan kendalikan seluruh pos belanja bahan baku, operasional harian, dan utilitas usaha."
         action={
-
-          <RangeSelect
-            value={
-              range
-            }
-
-            onChange={
-              setRange
-            }
-          />
-
+          <button className="primary-btn" onClick={openExpenseModal}>
+            <Plus size={16} />
+            <span>Tambah Catatan Pengeluaran</span>
+          </button>
         }
       />
 
-
-      {/* =================================================
-          ANALISIS PENJUALAN
-          ================================================= */}
-
-      <div className="analytics-grid">
-
-
-        {/* CHANNEL */}
-
-        <Panel
-          title="Kategori Penjualan"
-          hint="Pendapatan berdasarkan sumber penjualan"
-        >
-
-          <div
-            className="
-              analytics-chart
-            "
-          >
-
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-
-              <BarChart
-                data={
-                  data.channelStats ||
-                  []
-                }
-
-                margin={{
-                  top:
-                    12,
-
-                  right:
-                    8,
-
-                  left:
-                    4,
-
-                  bottom:
-                    4
-                }}
-              >
-
-
-                <CartesianGrid
-                  vertical={false}
-
-                  stroke="#E7EBEF"
-
-                  strokeDasharray="
-                    4 4
-                  "
-                />
-
-
-                <XAxis
-                  dataKey="channel"
-
-                  tickFormatter={
-                    channelLabel
-                  }
-
-                  tickLine={false}
-
-                  axisLine={false}
-
-                  tick={{
-                    fontSize:
-                      11,
-
-                    fill:
-                      '#687587'
-                  }}
-                />
-
-
-                <YAxis
-                  tickFormatter={
-                    shortMoney
-                  }
-
-                  tickLine={false}
-
-                  axisLine={false}
-
-                  width={
-                    48
-                  }
-
-                  tick={{
-                    fontSize:
-                      10,
-
-                    fill:
-                      '#8995A4'
-                  }}
-                />
-
-
-                <Tooltip
-
-                  formatter={
-                    (value) =>
-                      money(
-                        value
-                      )
-                  }
-
-                  contentStyle={{
-                    background:
-                      '#FFFFFF',
-
-                    border:
-                      '1px solid #E2E7ED',
-
-                    borderRadius:
-                      8,
-
-                    boxShadow:
-                      '0 10px 25px rgba(18,35,56,.10)',
-
-                    fontSize:
-                      11
-                  }}
-
-                  labelStyle={{
-                    color:
-                      '#263444',
-
-                    fontWeight:
-                      650,
-
-                    marginBottom:
-                      4
-                  }}
-
-                  cursor={{
-                    fill:
-                      'rgba(18,35,56,.035)'
-                  }}
-
-                />
-
-
-                <Bar
-                  dataKey="revenue"
-
-                  radius={[
-                    6,
-                    6,
-                    2,
-                    2
-                  ]}
-
-                  animationDuration={
-                    900
-                  }
-
-                  animationEasing="ease-out"
-                >
-
-
-                  {(
-                    data.channelStats ||
-                    []
-                  ).map(
-                    (
-                      entry,
-                      index
-                    ) => (
-
-                      <Cell
-                        key={
-                          `channel-${index}`
-                        }
-
-                        fill={
-                          channelPalette[
-                            index %
-                            channelPalette.length
-                          ]
-                        }
-                      />
-
-                    )
-                  )}
-
-
-                </Bar>
-
-
-              </BarChart>
-
-            </ResponsiveContainer>
-
+      {/* EXPENSE SUMMARY */}
+      <div className="finance-grid">
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <WalletCards size={20} />
           </div>
-
-        </Panel>
-
-
-        {/* JAM RAMAI */}
-
-        <Panel
-          title="Jam Ramai"
-          hint="Frekuensi transaksi berdasarkan waktu"
-        >
-
-          <div
-            className="
-              analytics-chart
-            "
-          >
-
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-            >
-
-              <AreaChart
-                data={
-                  data.hourly ||
-                  []
-                }
-
-                margin={{
-                  top:
-                    12,
-
-                  right:
-                    8,
-
-                  left:
-                    0,
-
-                  bottom:
-                    4
-                }}
-              >
-
-
-                <defs>
-
-                  <linearGradient
-                    id="
-                      hourAreaGradient
-                    "
-                    x1="0"
-                    y1="0"
-                    x2="0"
-                    y2="1"
-                  >
-
-                    <stop
-                      offset="0%"
-                      stopColor="#B39463"
-                      stopOpacity={
-                        0.28
-                      }
-                    />
-
-                    <stop
-                      offset="100%"
-                      stopColor="#B39463"
-                      stopOpacity={
-                        0.02
-                      }
-                    />
-
-                  </linearGradient>
-
-                </defs>
-
-
-                <CartesianGrid
-                  vertical={false}
-
-                  stroke="#E7EBEF"
-
-                  strokeDasharray="
-                    4 4
-                  "
-                />
-
-
-                <XAxis
-                  dataKey="hour"
-
-                  tickFormatter={
-                    (hour) =>
-                      `${hour}:00`
-                  }
-
-                  tickLine={false}
-
-                  axisLine={false}
-
-                  tick={{
-                    fontSize:
-                      10,
-
-                    fill:
-                      '#687587'
-                  }}
-                />
-
-
-                <YAxis
-                  allowDecimals={
-                    false
-                  }
-
-                  tickLine={false}
-
-                  axisLine={false}
-
-                  width={
-                    25
-                  }
-
-                  tick={{
-                    fontSize:
-                      10,
-
-                    fill:
-                      '#8995A4'
-                  }}
-                />
-
-
-                <Tooltip
-
-                  labelFormatter={
-                    (hour) =>
-                      `${hour}:00`
-                  }
-
-                  formatter={
-                    (value) =>
-                      [
-                        `${value} transaksi`,
-                        'Transaksi'
-                      ]
-                  }
-
-                  contentStyle={{
-                    background:
-                      '#FFFFFF',
-
-                    border:
-                      '1px solid #E2E7ED',
-
-                    borderRadius:
-                      8,
-
-                    boxShadow:
-                      '0 10px 25px rgba(18,35,56,.10)',
-
-                    fontSize:
-                      11
-                  }}
-
-                  labelStyle={{
-                    color:
-                      '#263444',
-
-                    fontWeight:
-                      650,
-
-                    marginBottom:
-                      4
-                  }}
-
-                  cursor={{
-                    stroke:
-                      '#B39463',
-
-                    strokeWidth:
-                      1
-                  }}
-
-                />
-
-
-                <Area
-                  type="monotone"
-
-                  dataKey="transactions"
-
-                  stroke="#9A7B4D"
-
-                  strokeWidth={
-                    2.3
-                  }
-
-                  fill="
-                    url(#hourAreaGradient)
-                  "
-
-                  activeDot={{
-                    r:
-                      4,
-
-                    fill:
-                      '#FFFFFF',
-
-                    stroke:
-                      '#9A7B4D',
-
-                    strokeWidth:
-                      2
-                  }}
-
-                  animationDuration={
-                    1000
-                  }
-
-                  animationEasing="ease-out"
-                />
-
-              </AreaChart>
-
-            </ResponsiveContainer>
-
+          <div>
+            <span>Total Pengeluaran</span>
+            <strong>{money(totalExpense)}</strong>
           </div>
+        </div>
 
-        </Panel>
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <Layers size={20} />
+          </div>
+          <div>
+            <span>Total Catatan Biaya</span>
+            <strong>{expenses.length} Pos Biaya</strong>
+          </div>
+        </div>
 
+        <div className="finance-summary">
+          <div className="finance-summary-icon">
+            <DollarSign size={20} />
+          </div>
+          <div>
+            <span>Rata-rata per Catatan</span>
+            <strong>{money(avgExpense)}</strong>
+          </div>
+        </div>
       </div>
 
-
-      {/* =================================================
-          PRODUK TERLARIS
-          ================================================= */}
-
-      <Panel
-        title="Produk Terlaris"
-        hint="Berdasarkan jumlah item terjual"
-      >
-
-        <div className="rank-list">
-
-          {(
-            data.products ||
-            []
-          ).map(
-            (
-              p,
-              i
-            ) => (
-
-              <div
-                className="rank-row"
-                key={
-                  p.menuId
-                }
-              >
-
-                <div className="rank-num">
-
-                  {String(
-                    i + 1
-                  ).padStart(
-                    2,
-                    '0'
-                  )}
-
-                </div>
-
-
-                <div
-                  className="
-                    rank-main
-                  "
-                >
-
-                  <strong>
-                    {p.name}
-                  </strong>
-
-                  <span>
-                    {
-                      p.quantity
-                    }
-                    {' '}
-                    item terjual
-                  </span>
-
-                </div>
-
-
-                <div
-                  className="
-                    rank-revenue
-                  "
-                >
-
-                  {money(
-                    p.revenue
-                  )}
-
-                </div>
-
-              </div>
-
-            )
-          )}
-
-
-          {!(
-            data.products ||
-            []
-          ).length && (
-
-            <div
-              className="
-                empty-state
-              "
-            >
-              Belum cukup data produk.
-            </div>
-
-          )}
-
-        </div>
-
-      </Panel>
-
-
-      {/* =================================================
-          REKOMENDASI BISNIS
-          ================================================= */}
-
-      <section
-        className="
-          performance-recommendations
-        "
-      >
-
-        <div
-          className="
-            section-heading
-          "
-        >
-
+      {/* EXPENSE TABLE */}
+      <div className="table-panel">
+        <div className="table-head">
           <div>
-
-            <span
-              className="
-                eyebrow
-                dark
-              "
-            >
-              DECISION SUPPORT
-            </span>
-
-
-            <h2>
-              Rekomendasi Bisnis
-            </h2>
-
-
-            <p>
-              Saran berdasarkan pola
-              penjualan dan kondisi
-              bisnis pada periode
-              terpilih.
-            </p>
-
+            <strong>Buku Kas Pengeluaran</strong>
+            <span>Menampilkan seluruh riwayat pengeluaran operasional Dapoersari</span>
           </div>
-
         </div>
 
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Kategori Biaya</th>
+                <th>Keterangan / Deskripsi</th>
+                <th className="right">Nominal</th>
+                <th className="right">Tindakan</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expenses.map((expense) => (
+                <tr key={expense.id}>
+                  <td>
+                    <span className="text-muted">{formatExpenseDate(expense.expenseDate)}</span>
+                  </td>
+                  <td>
+                    <span className="category-chip">{expense.categoryName}</span>
+                  </td>
+                  <td>
+                    <strong className="text-primary">{expense.note}</strong>
+                  </td>
+                  <td className="right">
+                    <strong className="amount-expense">{money(expense.amount)}</strong>
+                  </td>
+                  <td className="right">
+                    <button
+                      type="button"
+                      className="ghost-icon danger"
+                      onClick={() => remove(expense.id)}
+                      title="Hapus pengeluaran"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </td>
+                </tr>
+              ))}
 
-        <div
-          className="
-            recommendation-list
-          "
-        >
-
-          {(
-            recommendationData
-              .recommendations ||
-            []
-          ).map(
-            (
-              r,
-              i
-            ) => (
-
-              <div
-                className={
-                  `recommend-card ${
-                    r.level
-                  }`
-                }
-
-                key={i}
-              >
-
-                <div
-                  className="
-                    recommend-icon
-                  "
-                >
-
-                  {
-                    iconForRecommendation(
-                      r.type
-                    )
-                  }
-
-                </div>
-
-
-                <div>
-
-                  <span
-                    className="
-                      recommend-label
-                    "
-                  >
-
-                    {r.level ===
-                    'high'
-                      ? 'PRIORITAS TINGGI'
-                      : r.level ===
-                        'medium'
-                      ? 'PERLU DIPERHATIKAN'
-                      : 'INFORMASI'}
-
-                  </span>
-
-
-                  <h3>
-                    {r.title}
-                  </h3>
-
-
-                  <p>
-                    {r.text}
-                  </p>
-
-                </div>
-
-              </div>
-
-            )
-          )}
-
-
-          {!(
-            recommendationData
-              .recommendations ||
-            []
-          ).length && (
-
-            <div
-              className="
-                empty-state
-              "
-            >
-              Belum ada rekomendasi
-              untuk periode ini.
-            </div>
-
-          )}
-
+              {expenses.length === 0 && (
+                <tr>
+                  <td colSpan="5" className="empty-cell">
+                    <div className="empty-state">
+                      <WalletCards size={32} />
+                      <strong>Belum ada catatan pengeluaran</strong>
+                      <span>Klik tombol "Tambah Catatan Pengeluaran" di atas untuk mencatat biaya baru.</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
+      </div>
 
-
-        <div
-          className="
-            recommend-note
-          "
-        >
-
-          <Sparkles
-            size={18}
-          />
-
-          <div>
-
-            <strong>
-              Dasar rekomendasi
-            </strong>
-
-
-            <p>
-              Rekomendasi dibuat dari
-              data transaksi selesai,
-              performa produk,
-              channel penjualan,
-              dan tarif platform.
-            </p>
-
-          </div>
-
-        </div>
-
-      </section>
-
+      {/* ADD EXPENSE MODAL */}
+      {modal && (
+        <ExpenseModal categories={categories} onClose={() => setModal(false)} onSave={save} />
+      )}
     </>
   );
 }
 
+/* =========================================================
+   ADD EXPENSE MODAL
+   ========================================================= */
+function ExpenseModal({ categories, onClose, onSave }) {
+  const [form, setForm] = useState({
+    categoryId: categories[0]?.id || '',
+    amount: '',
+    expenseDate: new Date().toISOString().slice(0, 10),
+    note: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.categoryId) {
+      alert('Pilih kategori pengeluaran terlebih dahulu.');
+      return;
+    }
+    if (Number(form.amount) <= 0) {
+      alert('Nominal pengeluaran harus lebih besar dari Rp 0.');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave(form);
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Gagal menyimpan catatan pengeluaran.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <form className="modal-card" onSubmit={submit} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head">
+          <div>
+            <span className="eyebrow">BUKU KAS PENGELUARAN</span>
+            <h3>Tambah Pengeluaran</h3>
+          </div>
+          <button type="button" className="ghost-icon" onClick={onClose} aria-label="Tutup">
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="form-grid">
+          <div className="form-group">
+            <label>Tanggal Transaksi</label>
+            <input
+              type="date"
+              value={form.expenseDate}
+              onChange={(e) => setForm({ ...form, expenseDate: e.target.value })}
+              required
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Kategori Biaya</label>
+            <select
+              value={form.categoryId}
+              onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+              required
+            >
+              <option value="">Pilih Kategori</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group full">
+            <label>Deskripsi / Keterangan Belanja</label>
+            <input
+              value={form.note}
+              onChange={(e) => setForm({ ...form, note: e.target.value })}
+              placeholder="Contoh: Pembelian beras 25kg & bumbu dapur"
+              required
+            />
+          </div>
+
+          <div className="form-group full">
+            <label>Nominal Pengeluaran (Rp)</label>
+            <input
+              type="number"
+              min="1"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              placeholder="Masukkan nominal (cth: 150000)"
+              required
+            />
+            {form.amount > 0 && <small className="input-helper-text">Konfirmasi: {money(form.amount)}</small>}
+          </div>
+        </div>
+
+        <div className="modal-actions">
+          <button type="button" className="secondary-btn" onClick={onClose} disabled={saving}>
+            Batal
+          </button>
+          <button type="submit" className="primary-btn" disabled={saving}>
+            {saving ? 'Menyimpan...' : 'Simpan Pengeluaran'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
 
 /* =========================================================
-   REPORTS
+   5. ANALYTICS COMPONENT (PERFORMA TOKO & REKOMENDASI)
    ========================================================= */
+function Analytics() {
+  const [range, setRange] = useRange('30d');
+  const [data, setData] = useState(null);
+  const [recommendationData, setRecommendationData] = useState(null);
+  const [error, setError] = useState('');
 
+  useEffect(() => {
+    let active = true;
+    setError('');
+    setData(null);
+    setRecommendationData(null);
+
+    Promise.all([
+      api.get('/analytics', { params: { range } }),
+      api.get('/recommendations', { params: { range } })
+    ])
+      .then(([analyticsResponse, recommendationResponse]) => {
+        if (!active) return;
+        setData(analyticsResponse.data);
+        setRecommendationData(recommendationResponse.data);
+      })
+      .catch((e) => {
+        if (!active) return;
+        console.error('Gagal memuat analitik performa toko:', e);
+        setError(e?.response?.data?.error || 'Gagal memuat data performa toko.');
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [range]);
+
+  if (error) return <ErrorState message={error} />;
+  if (!data || !recommendationData) return <LoadingPage />;
+
+  const products = Array.isArray(data.products) ? data.products : [];
+  const recommendations = Array.isArray(recommendationData)
+    ? recommendationData
+    : Array.isArray(recommendationData.recommendations)
+    ? recommendationData.recommendations
+    : [];
+
+  return (
+    <>
+      <PageHeader
+        eyebrow="INTELIJEN BISNIS"
+        title="Performa Toko & Produk"
+        subtitle="Analisis produk terlaris, kontribusi omzet per menu, dan rekomendasi strategis peningkatan profit."
+        action={<RangeSelect value={range} onChange={setRange} />}
+      />
+
+      {/* TOP PRODUCTS LEADERBOARD */}
+      <div className="two-col-grid">
+        <Panel title="Peringkat Menu Terlaris" hint={`Berdasarkan volume penjualan (${range})`}>
+          <div className="rank-list">
+            {products.slice(0, 10).map((prod, idx) => (
+              <div className="rank-row" key={prod.menuId || prod.name || idx}>
+                <div className={`rank-badge rank-${idx + 1}`}>#{idx + 1}</div>
+                <div className="rank-main">
+                  <strong>{prod.name}</strong>
+                  <span>{prod.quantity || 0} porsi terjual</span>
+                </div>
+                <div className="rank-revenue">{money(prod.revenue || 0)}</div>
+              </div>
+            ))}
+
+            {products.length === 0 && <div className="empty-cell">Belum ada data penjualan produk pada periode ini.</div>}
+          </div>
+        </Panel>
+
+        <Panel title="Distribusi Kategori Penjualan" hint="Proporsi volume per channel">
+          <div className="analytics-channel-breakdown">
+            {Array.isArray(data.channelStats) &&
+              data.channelStats.map((ch) => (
+                <div className="channel-stat-card" key={ch.channel}>
+                  <div className="stat-head">
+                    <ChannelBadge channel={ch.channel} />
+                    <strong>{money(ch.revenue || ch.total || 0)}</strong>
+                  </div>
+                  <div className="stat-sub">
+                    <span>{ch.orderCount || ch.count || 0} pesanan selesai</span>
+                  </div>
+                </div>
+              ))}
+          </div>
+
+          <div className="store-health-box">
+            <div className="health-icon">
+              <Activity size={20} />
+            </div>
+            <div>
+              <strong>Kesehatan Operasional: Optimal</strong>
+              <p>Rasio pengeluaran terhadap omzet berada dalam batas aman target profitabilitas.</p>
+            </div>
+          </div>
+        </Panel>
+      </div>
+
+      {/* STRATEGIC RECOMMENDATIONS */}
+      <div className="performance-recommendations">
+        <div className="section-heading">
+          <h2>Rekomendasi Strategis AI & Eksekutif</h2>
+          <p>Peluang optimasi harga, promosi menu, dan efisiensi biaya berdasarkan data transaksi historis.</p>
+        </div>
+
+        <div className="recommendation-list">
+          {recommendations.map((rec, i) => (
+            <div key={i} className={`recommend-card ${rec.priority === 'high' ? 'high' : ''}`}>
+              <div className="recommend-icon">
+                <Sparkles size={20} />
+              </div>
+              <div className="recommend-body">
+                <span className="recommend-label">{rec.category || 'STRATEGI BISNIS'}</span>
+                <h3>{rec.title}</h3>
+                <p>{rec.description}</p>
+                {rec.actionText && (
+                  <div className="recommend-action-tag">
+                    <span>Saran: {rec.actionText}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {recommendations.length === 0 && (
+            <div className="recommend-card">
+              <div className="recommend-icon">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <span className="recommend-label">OPTIMASI MENU</span>
+                <h3>Tingkatkan Promosi Menu Unggulan</h3>
+                <p>Menu terlaris dapat dijadikan paket bundling pada jam sibuk makan siang untuk meningkatkan Average Order Value.</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* =========================================================
+   6. REPORTS COMPONENT (LAPORAN EKSEKUTIF)
+   ========================================================= */
 function Reports() {
   const [range, setRange] = useRange('30d');
-
-  const [exportOpen, setExportOpen] =
-    useState(false);
-
-  const exportMenuRef =
-    useRef(null);
-
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportMenuRef = useRef(null);
   const [dash, setDash] = useState(null);
   const [analytics, setAnalytics] = useState(null);
   const [sales, setSales] = useState(null);
-
-  const [activeReport, setActiveReport] =
-    useState('ringkasan');
-
+  const [activeReport, setActiveReport] = useState('ringkasan');
   const [error, setError] = useState('');
-
-
-  /* =====================================================
-     LOAD DATA
-     ===================================================== */
 
   useEffect(() => {
     setDash(null);
@@ -7556,2534 +1826,1292 @@ function Reports() {
     setExportOpen(false);
 
     Promise.all([
-      api.get('/dashboard', {
-        params: {
-          range
-        }
-      }),
-
-      api.get('/analytics', {
-        params: {
-          range
-        }
-      }),
-
-      api.get('/sales', {
-        params: {
-          range
-        }
-      })
+      api.get('/dashboard', { params: { range } }),
+      api.get('/analytics', { params: { range } }),
+      api.get('/sales', { params: { range } })
     ])
-      .then(
-        ([
-          dashboardResponse,
-          analyticsResponse,
-          salesResponse
-        ]) => {
-          setDash(
-            dashboardResponse.data
-          );
-
-          setAnalytics(
-            analyticsResponse.data
-          );
-
-          setSales(
-            salesResponse.data
-          );
-        }
-      )
+      .then(([dashboardResponse, analyticsResponse, salesResponse]) => {
+        setDash(dashboardResponse.data);
+        setAnalytics(analyticsResponse.data);
+        setSales(salesResponse.data);
+      })
       .catch((e) => {
-        console.error(
-          'Gagal memuat laporan:',
-          e
-        );
-
-        setError(
-          e?.response?.data?.error ||
-          e?.message ||
-          'Gagal memuat laporan.'
-        );
+        console.error('Gagal memuat laporan:', e);
+        setError(e?.response?.data?.error || e?.message || 'Gagal memuat laporan.');
       });
   }, [range]);
 
-
-  /* =====================================================
-     CLOSE EXPORT MENU WHEN CLICK OUTSIDE
-     ===================================================== */
-
   useEffect(() => {
     const handleOutsideClick = (event) => {
-      if (
-        exportMenuRef.current &&
-        !exportMenuRef.current.contains(
-          event.target
-        )
-      ) {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
         setExportOpen(false);
       }
     };
-
-    document.addEventListener(
-      'click',
-      handleOutsideClick
-    );
-
-    return () => {
-      document.removeEventListener(
-        'click',
-        handleOutsideClick
-      );
-    };
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
   }, []);
 
-
-  /* =====================================================
-     STATE
-     ===================================================== */
-
-  if (error) {
-    return (
-      <ErrorState
-        message={error}
-      />
-    );
-  }
-
-
-  if (!dash || !analytics || !sales) {
-    return (
-      <LoadingPage />
-    );
-  }
-
-
-  /* =====================================================
-     DATA
-     ===================================================== */
-
-  const summary =
-    dash?.summary || {};
-
-
-  const rows =
-    Array.isArray(
-      sales?.rows
-    )
-      ? sales.rows
-      : [];
-
-
-  const grossSales =
-    Number(
-      summary.grossSales || 0
-    );
-
-
-  const platformDeduction =
-    Number(
-      summary.platformDeduction || 0
-    );
-
-
-  const netSales =
-    Number(
-      summary.netSales ??
-      (
-        grossSales -
-        platformDeduction
-      )
-    );
-
-
-  const expenseTotal =
-    Number(
-      summary.expenseTotal || 0
-    );
-
-
-  const netProfit =
-    Number(
-      summary.netProfit ??
-      (
-        netSales -
-        expenseTotal
-      )
-    );
-
-
-  const transactionCount =
-    Number(
-      summary.transactionCount ??
-      rows.length ??
-      0
-    );
-
-
-  const averageTransaction =
-    transactionCount > 0
-      ? grossSales /
-        transactionCount
-      : 0;
-
-
-  const profitMargin =
-    grossSales > 0
-      ? (
-          netProfit /
-          grossSales
-        ) *
-        100
-      : 0;
-
-
-  /* =====================================================
-     CHANNEL
-     ===================================================== */
-
-  const channelTotals = {
-    website: 0,
-    offline: 0,
-    shopeefood: 0
-  };
-
-
-  const analyticsChannels =
-    Array.isArray(
-      analytics?.channelStats
-    )
-      ? analytics.channelStats
-      : [];
-
-
-  analyticsChannels.forEach(
-    (item) => {
-      const key =
-        String(
-          item.channel || ''
-        ).toLowerCase();
-
-      if (
-        Object.prototype.hasOwnProperty.call(
-          channelTotals,
-          key
-        )
-      ) {
-        channelTotals[key] +=
-          Number(
-            item.revenue ||
-            item.total ||
-            item.amount ||
-            0
-          );
-      }
-    }
-  );
-
-
-  /*
-   * Fallback menggunakan transaksi
-   */
-
-  const hasChannelData =
-    Object.values(
-      channelTotals
-    ).some(
-      (value) =>
-        Number(value) > 0
-    );
-
-
-  if (!hasChannelData) {
-    rows.forEach(
-      (row) => {
-        const key =
-          String(
-            row.channel ||
-            'website'
-          ).toLowerCase();
-
-        if (
-          Object.prototype.hasOwnProperty.call(
-            channelTotals,
-            key
-          )
-        ) {
-          channelTotals[key] +=
-            Number(
-              row.total || 0
-            );
-        }
-      }
-    );
-  }
-
-
-  const largestChannelEntry =
-    Object.entries(
-      channelTotals
-    )
-      .sort(
-        (
-          [, a],
-          [, b]
-        ) =>
-          Number(b) -
-          Number(a)
-      )[0];
-
-
-  const largestChannel =
-    largestChannelEntry &&
-    Number(
-      largestChannelEntry[1]
-    ) > 0
-      ? channelLabel(
-          largestChannelEntry[0]
-        )
-      : '-';
-
-
-  /* =====================================================
-     PRODUK
-     ===================================================== */
-
-  const products =
-    Array.isArray(
-      analytics?.products
-    )
-      ? analytics.products
-      : [];
-
-
-  const totalProductsSold =
-    products.reduce(
-      (
-        sum,
-        item
-      ) =>
-        sum +
-        Number(
-          item.quantity || 0
-        ),
-      0
-    );
-
-
-  const bestProduct =
-    [...products]
-      .sort(
-        (
-          a,
-          b
-        ) =>
-          Number(
-            b.quantity || 0
-          ) -
-          Number(
-            a.quantity || 0
-          )
-      )[0];
-
-
-  const bestProductName =
-    bestProduct?.name ||
-    '-';
-
-
-  /* =====================================================
-     TREND PENJUALAN
-     DIBUAT DARI DATA TRANSAKSI
-     ===================================================== */
-
-  const trendMap = {};
-
-
-  rows.forEach(
-    (row) => {
-      if (!row.orderedAt) {
-        return;
-      }
-
-      const date =
-        new Date(
-          row.orderedAt
-        );
-
-
-      if (
-        Number.isNaN(
-          date.getTime()
-        )
-      ) {
-        return;
-      }
-
-
-      const key =
-        date.toISOString()
-          .slice(
-            0,
-            10
-          );
-
-
-      trendMap[key] =
-        (
-          trendMap[key] || 0
-        ) +
-        Number(
-          row.total || 0
-        );
-    }
-  );
-
-
-  const trend =
-    Object.entries(
-      trendMap
-    )
-      .sort(
-        ([a], [b]) =>
-          a.localeCompare(b)
-      )
-      .slice(-14);
-
-
-  const maxTrend =
-    Math.max(
-      ...trend.map(
-        ([, value]) =>
-          Number(value)
-      ),
-      1
-    );
-
-
-  const formatTrendDate =
-    (value) => {
-      const date =
-        new Date(
-          `${value}T00:00:00`
-        );
-
-      if (
-        Number.isNaN(
-          date.getTime()
-        )
-      ) {
-        return '-';
-      }
-
-      return date.toLocaleDateString(
-        'id-ID',
-        {
-          day: '2-digit',
-          month: 'short'
-        }
-      );
-    };
-
-
-  /* =====================================================
-     EXPORT CSV
-     ===================================================== */
-
+  if (error) return <ErrorState message={error} />;
+  if (!dash || !analytics || !sales) return <LoadingPage />;
+
+  const summary = dash?.summary || {};
+  const rows = Array.isArray(sales?.rows) ? sales.rows : [];
+  const grossSales = Number(summary.grossSales || 0);
+  const platformDeduction = Number(summary.platformDeduction || 0);
+  const netSales = Number(summary.netSales ?? (grossSales - platformDeduction));
+  const expenseTotal = Number(summary.expenseTotal || 0);
+  const netProfit = Number(summary.netProfit ?? (netSales - expenseTotal));
+  const transactionCount = Number(summary.transactionCount ?? rows.length ?? 0);
+  const averageTransaction = transactionCount > 0 ? grossSales / transactionCount : 0;
+  const profitMargin = grossSales > 0 ? (netProfit / grossSales) * 100 : 0;
+
+  const products = Array.isArray(analytics?.products) ? analytics.products : [];
+  const bestProduct = [...products].sort((a, b) => Number(b.quantity || 0) - Number(a.quantity || 0))[0];
+  const bestProductName = bestProduct?.name || '-';
+
+  // EXPORT HANDLERS
   const exportCSV = () => {
-    const header = [
-      'Bagian',
-      'Indikator',
-      'Nilai'
-    ];
-
-
+    const header = ['Bagian Laporan', 'Indikator / Metrik', 'Nilai'];
     const body = [
-      [
-        'Ringkasan Keuangan',
-        'Penjualan Kotor',
-        grossSales
-      ],
-
-      [
-        'Ringkasan Keuangan',
-        'Potongan Platform',
-        platformDeduction
-      ],
-
-      [
-        'Ringkasan Keuangan',
-        'Penjualan Bersih',
-        netSales
-      ],
-
-      [
-        'Ringkasan Keuangan',
-        'Pengeluaran',
-        expenseTotal
-      ],
-
-      [
-        'Ringkasan Keuangan',
-        'Laba Bersih',
-        netProfit
-      ],
-
-      [
-        'Ringkasan Keuangan',
-        'Margin Laba Bersih',
-        `${profitMargin.toFixed(1)}%`
-      ],
-
-      [
-        'Performa Channel',
-        'Website',
-        channelTotals.website
-      ],
-
-      [
-        'Performa Channel',
-        'Offline',
-        channelTotals.offline
-      ],
-
-      [
-        'Performa Channel',
-        'ShopeeFood',
-        channelTotals.shopeefood
-      ],
-
-      [
-        'Performa Channel',
-        'Total',
-        grossSales
-      ],
-
-      [
-        'Operasional',
-        'Total Transaksi',
-        transactionCount
-      ],
-
-      [
-        'Operasional',
-        'Rata-rata Transaksi',
-        averageTransaction
-      ],
-
-      [
-        'Operasional',
-        'Produk Terjual',
-        totalProductsSold
-      ],
-
-      [
-        'Operasional',
-        'Channel Terbesar',
-        largestChannel
-      ],
-
-      [
-        'Operasional',
-        'Produk Terlaris',
-        bestProductName
-      ]
+      ['Ringkasan Keuangan', 'Penjualan Kotor', grossSales],
+      ['Ringkasan Keuangan', 'Potongan Platform ShopeeFood', platformDeduction],
+      ['Ringkasan Keuangan', 'Penjualan Bersih', netSales],
+      ['Ringkasan Keuangan', 'Pengeluaran Operasional', expenseTotal],
+      ['Ringkasan Keuangan', 'Laba Bersih', netProfit],
+      ['Ringkasan Keuangan', 'Margin Laba Bersih', `${profitMargin.toFixed(1)}%`],
+      ['Operasional', 'Total Transaksi Selesai', transactionCount],
+      ['Operasional', 'Rata-rata Nilai Pesanan', averageTransaction],
+      ['Operasional', 'Menu Terlaris', bestProductName]
     ];
 
+    const csv = [header, ...body]
+      .map((row) => row.map((v) => `"${String(v ?? '').replaceAll('"', '""')}"`).join(','))
+      .join('\n');
 
-    const csv =
-      [
-        header,
-        ...body
-      ]
-        .map(
-          (row) =>
-            row
-              .map(
-                (value) =>
-                  `"${String(
-                    value ?? ''
-                  ).replaceAll(
-                    '"',
-                    '""'
-                  )}"`
-              )
-              .join(',')
-        )
-        .join('\n');
-
-
-    const blob =
-      new Blob(
-        [
-          '\ufeff',
-          csv
-        ],
-        {
-          type:
-            'text/csv;charset=utf-8;'
-        }
-      );
-
-
-    const url =
-      URL.createObjectURL(
-        blob
-      );
-
-
-    const link =
-      document.createElement(
-        'a'
-      );
-
-
-    link.href =
-      url;
-
-
-    link.download =
-      `laporan-manajemen-${range}.csv`;
-
-
-    document.body.appendChild(
-      link
-    );
-
-
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `laporan-keuangan-dapoersari-${range}.csv`;
+    document.body.appendChild(link);
     link.click();
-
-
     link.remove();
-
-
-    URL.revokeObjectURL(
-      url
-    );
+    URL.revokeObjectURL(url);
   };
-
-
-  /* =====================================================
-     EXPORT EXCEL
-     ===================================================== */
 
   const exportExcel = () => {
     const data = [
-      [
-        'LAPORAN MANAJEMEN DAPOERSARI'
-      ],
-
+      ['LAPORAN KEUANGAN EKSEKUTIF DAPOERSARI'],
+      ['Periode:', range],
+      ['Tanggal Dibuat:', new Date().toLocaleDateString('id-ID')],
       [],
-
-      [
-        'Periode',
-        range
-      ],
-
+      ['RINGKASAN KEUANGAN'],
+      ['Penjualan Kotor (Gross Sales)', grossSales],
+      ['Potongan Platform ShopeeFood', platformDeduction],
+      ['Penjualan Bersih (Net Sales)', netSales],
+      ['Pengeluaran Operasional (OpEx)', expenseTotal],
+      ['Laba Bersih (Net Profit)', netProfit],
+      ['Margin Laba Bersih', `${profitMargin.toFixed(1)}%`],
       [],
-
-      [
-        'RINGKASAN KEUANGAN'
-      ],
-
-      [
-        'Penjualan Kotor',
-        grossSales
-      ],
-
-      [
-        'Potongan Platform',
-        platformDeduction
-      ],
-
-      [
-        'Penjualan Bersih',
-        netSales
-      ],
-
-      [
-        'Pengeluaran',
-        expenseTotal
-      ],
-
-      [
-        'Laba Bersih',
-        netProfit
-      ],
-
-      [
-        'Margin Laba',
-        `${profitMargin.toFixed(1)}%`
-      ],
-
-      [],
-
-      [
-        'PERFORMA CHANNEL'
-      ],
-
-      [
-        'Website',
-        channelTotals.website
-      ],
-
-      [
-        'ShopeeFood',
-        channelTotals.shopeefood
-      ],
-
-      [
-        'Offline',
-        channelTotals.offline
-      ],
-
-      [],
-
-      [
-        'OPERASIONAL'
-      ],
-
-      [
-        'Total Transaksi',
-        transactionCount
-      ],
-
-      [
-        'Rata-rata Transaksi',
-        averageTransaction
-      ],
-
-      [
-        'Produk Terjual',
-        totalProductsSold
-      ],
-
-      [
-        'Channel Terbesar',
-        largestChannel
-      ],
-
-      [
-        'Produk Terlaris',
-        bestProductName
-      ]
+      ['OPERASIONAL & TRANSAKSI'],
+      ['Total Transaksi', transactionCount],
+      ['Rata-rata Nilai Pesanan', averageTransaction],
+      ['Menu Terlaris', bestProductName]
     ];
 
-
-    const worksheet =
-      XLSX.utils.aoa_to_sheet(
-        data
-      );
-
-
-    worksheet['!cols'] = [
-      {
-        wch: 30
-      },
-
-      {
-        wch: 24
-      }
-    ];
-
-
-    const workbook =
-      XLSX.utils.book_new();
-
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      worksheet,
-      'Laporan'
-    );
-
-
-    XLSX.writeFile(
-      workbook,
-      `laporan-dapoersari-${range}.xlsx`
-    );
+    const worksheet = XLSX.utils.aoa_to_sheet(data);
+    worksheet['!cols'] = [{ wch: 32 }, { wch: 24 }];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Laporan Keuangan');
+    XLSX.writeFile(workbook, `laporan-dapoersari-${range}.xlsx`);
   };
 
-
-  /* =====================================================
-     EXPORT PDF
-     ===================================================== */
-
   const exportPDF = () => {
-    const doc =
-      new jsPDF({
-        orientation:
-          'portrait',
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
 
-        unit:
-          'mm',
+    // 1. TOP OFFICIAL HEADER BAND (NAVY + INDIGO ACCENT)
+    doc.setFillColor(15, 23, 42); // #0f172a
+    doc.rect(0, 0, pageWidth, 28, 'F');
 
-        format:
-          'a4'
-      });
+    doc.setFillColor(79, 70, 229); // #4f46e5 (Indigo Accent Line)
+    doc.rect(0, 28, pageWidth, 2, 'F');
 
+    // Header Text
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13.5);
+    doc.text('DAPOERSARI RESTORAN & CATERING', 14, 12);
 
-    const pageWidth =
-      doc.internal.pageSize.getWidth();
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(165, 180, 252);
+    doc.text('PORTAL KEUANGAN EKSEKUTIF • SISTEM LAPORAN RESMI', 14, 18);
 
+    doc.setFontSize(7.5);
+    doc.setTextColor(203, 213, 225);
+    const docRef = `REF: DPR/FIN/${new Date().getFullYear()}/${range.toUpperCase()}-${Date.now().toString().slice(-4)}`;
+    doc.text(docRef, pageWidth - 14, 12, { align: 'right' });
+    doc.text(`Dicetak: ${new Date().toLocaleString('id-ID')}`, pageWidth - 14, 18, { align: 'right' });
 
-    doc.setTextColor(
-      15,
-      31,
-      47
-    );
+    // 2. DOCUMENT TITLE & METADATA CARD
+    let currentY = 38;
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(14);
+    doc.text('LAPORAN RESMI KINERJA KEUANGAN & OPERASIONAL', 14, currentY);
 
+    currentY += 5;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('Rekapitulasi berkala kinerja omzet, beban platform, pengeluaran operasional, dan laba bersih.', 14, currentY);
 
-    doc.setFontSize(
-      18
-    );
+    currentY += 5;
 
+    // Metadata box
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.roundedRect(14, currentY, pageWidth - 28, 17, 2, 2, 'FD');
 
-    doc.setFont(
-      'helvetica',
-      'bold'
-    );
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('PERIODE EVALUASI', 18, currentY + 5.5);
+    doc.text('STATUS DOKUMEN', 72, currentY + 5.5);
+    doc.text('PENANGGUNG JAWAB', 125, currentY + 5.5);
 
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(8.5);
+    doc.setTextColor(15, 23, 42);
+    const rangeLabel = range === 'today' ? 'Hari Ini' : range === '7d' ? '7 Hari Terakhir' : range === '30d' ? '30 Hari Terakhir' : '90 Hari Terakhir';
+    doc.text(rangeLabel, 18, currentY + 11.5);
 
-    doc.text(
-      'Laporan Manajemen Dapoersari',
-      14,
-      18
-    );
+    doc.setTextColor(5, 150, 105);
+    doc.text('SAH & TERVERIFIKASI SISTEM', 72, currentY + 11.5);
 
+    doc.setTextColor(15, 23, 42);
+    doc.text('Linda Kumalasari (Executive Owner)', 125, currentY + 11.5);
 
-    doc.setFontSize(
-      9
-    );
+    currentY += 23;
 
+    // 3. TABEL 1: LAPORAN LABA & RUGI (INCOME STATEMENT)
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text('I. LAPORAN LABA & RUGI (INCOME STATEMENT)', 14, currentY);
 
-    doc.setFont(
-      'helvetica',
-      'normal'
-    );
+    currentY += 3;
 
-
-    doc.setTextColor(
-      100,
-      116,
-      132
-    );
-
-
-    doc.text(
-      `Periode: ${range}`,
-      14,
-      25
-    );
-
-
-    autoTable(
-      doc,
-      {
-        startY:
-          32,
-
-        head: [
-          [
-            'Indikator',
-            'Nilai'
-          ]
-        ],
-
-        body: [
-          [
-            'Penjualan Kotor',
-            money(
-              grossSales
-            )
-          ],
-
-          [
-            'Potongan Platform',
-            money(
-              platformDeduction
-            )
-          ],
-
-          [
-            'Penjualan Bersih',
-            money(
-              netSales
-            )
-          ],
-
-          [
-            'Pengeluaran',
-            money(
-              expenseTotal
-            )
-          ],
-
-          [
-            'Laba Bersih',
-            money(
-              netProfit
-            )
-          ],
-
-          [
-            'Margin Laba',
-            `${profitMargin.toFixed(1)}%`
-          ],
-
-          [
-            'Total Transaksi',
-            transactionCount
-          ],
-
-          [
-            'Produk Terjual',
-            totalProductsSold
-          ],
-
-          [
-            'Rata-rata Transaksi',
-            money(
-              averageTransaction
-            )
-          ],
-
-          [
-            'Channel Terbesar',
-            largestChannel
-          ],
-
-          [
-            'Produk Terlaris',
-            bestProductName
-          ]
-        ],
-
-        theme:
-          'grid',
-
-        styles: {
-          font:
-            'helvetica',
-
-          fontSize:
-            9,
-
-          cellPadding:
-            5,
-
-          textColor: [
-            50,
-            63,
-            77
-          ]
-        },
-
-        headStyles: {
-          fillColor: [
-            11,
-            26,
-            42
-          ],
-
-          textColor: [
-            255,
-            255,
-            255
-          ],
-
-          fontStyle:
-            'bold'
-        },
-
-        alternateRowStyles: {
-          fillColor: [
-            248,
-            250,
-            251
-          ]
-        },
-
-        columnStyles: {
-          0: {
-            cellWidth:
-              95
-          },
-
-          1: {
-            cellWidth:
-              pageWidth -
-              109
+    autoTable(doc, {
+      startY: currentY,
+      head: [['No', 'Komponen Finansial', 'Keterangan Analisis', 'Jumlah (IDR)']],
+      body: [
+        ['1', 'Pendapatan Penjualan Kotor (Gross)', 'Total seluruh transaksi masuk sebelum komisi', money(grossSales)],
+        ['2', 'Potongan Komisi ShopeeFood', 'Biaya komisi layanan platform (25%)', `- ${money(platformDeduction)}`],
+        ['3', 'Pendapatan Penjualan Bersih (Net Revenue)', 'Omzet bersih setelah potongan komisi platform', money(netSales)],
+        ['4', 'Pengeluaran Operasional Usaha (OpEx)', 'Belanja bahan baku dapur, utilitas & logistik', `- ${money(expenseTotal)}`],
+        ['5', 'LABA BERSIH USAHA (NET PROFIT)', `Margin Keuntungan Bersih: ${profitMargin.toFixed(1)}%`, money(netProfit)],
+      ],
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 3.2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [15, 23, 42], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 10, halign: 'center' },
+        1: { cellWidth: 70, fontStyle: 'bold' },
+        2: { cellWidth: 62 },
+        3: { cellWidth: pageWidth - 28 - 142, halign: 'right', fontStyle: 'bold' }
+      },
+      didParseCell: (data) => {
+        if (data.row.index === 4) {
+          data.cell.styles.fillColor = [236, 253, 245];
+          data.cell.styles.textColor = [4, 120, 87];
+          data.cell.styles.fontStyle = 'bold';
+        } else if (data.row.index === 1 || data.row.index === 3) {
+          if (data.column.index === 3) {
+            data.cell.styles.textColor = [225, 29, 72];
           }
         }
       }
-    );
+    });
 
+    currentY = doc.lastAutoTable.finalY + 8;
 
-    const finalY =
-      doc.lastAutoTable?.finalY ||
-      45;
+    // 4. TABEL 2: INDIKATOR OPERASIONAL & PRODUK UNGGULAN
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(15, 23, 42);
+    doc.text('II. INDIKATOR OPERASIONAL & MENU TERLARIS', 14, currentY);
 
+    currentY += 3;
 
-    doc.setFontSize(
-      9
-    );
+    autoTable(doc, {
+      startY: currentY,
+      head: [['Metrik Operasional', 'Hasil Evaluasi', 'Catatan Evaluasi Bisnis']],
+      body: [
+        ['Total Transaksi Selesai', `${transactionCount} Transaksi`, 'Seluruh pesanan selesai & lunas tercatat di buku kas'],
+        ['Rata-rata Nilai Pesanan (AOV)', money(averageTransaction), 'Rata-rata pembelanjaan pelanggan per pesanan'],
+        ['Menu Terlaris (#1 Top Seller)', bestProductName, `${bestProduct ? Number(bestProduct.quantity || 0) : 0} porsi terjual pada periode ini`],
+        ['Margin Laba Bersih', `${profitMargin.toFixed(1)}%`, 'Rasio laba bersih terhadap omzet kotor keseluruhan'],
+      ],
+      theme: 'grid',
+      styles: { font: 'helvetica', fontSize: 8, cellPadding: 3.2, textColor: [30, 41, 59] },
+      headStyles: { fillColor: [79, 70, 229], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8 },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      columnStyles: {
+        0: { cellWidth: 55, fontStyle: 'bold' },
+        1: { cellWidth: 45, fontStyle: 'bold' },
+        2: { cellWidth: pageWidth - 28 - 100 }
+      }
+    });
 
+    currentY = doc.lastAutoTable.finalY + 12;
 
-    doc.setTextColor(
-      130,
-      140,
-      150
-    );
+    // 5. SIGNATURE & OFFICIAL VALIDATION BLOCK
+    const signY = Math.min(currentY, pageHeight - 44);
 
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(100, 116, 139);
+    doc.text('Dibuat Oleh:', 24, signY);
+    doc.text('Disetujui & Disahkan Oleh:', pageWidth - 68, signY);
 
-    doc.text(
-      'Dapoersari Owner Workspace',
-      14,
-      finalY + 12
-    );
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(15, 23, 42);
+    doc.text('Sistem Finansial Dapoersari', 24, signY + 16);
+    doc.text('Linda Kumalasari', pageWidth - 68, signY + 16);
 
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text('Sistem Otomatis Terenkripsi', 24, signY + 20);
+    doc.text('Executive Owner', pageWidth - 68, signY + 20);
 
-    doc.save(
-      `laporan-dapoersari-${range}.pdf`
-    );
+    // 6. OFFICIAL FOOTER
+    doc.setFillColor(241, 245, 249);
+    doc.rect(0, pageHeight - 9, pageWidth, 9, 'F');
+
+    doc.setFontSize(7);
+    doc.setTextColor(148, 163, 184);
+    doc.text('DOKUMEN INI RAHASIA & SAH SECARA HUKUM • DAPOERSARI ENTERPRISE SUITE', 14, pageHeight - 3.5);
+    doc.text('Halaman 1 dari 1', pageWidth - 14, pageHeight - 3.5, { align: 'right' });
+
+    doc.save(`laporan-resmi-dapoersari-${range}.pdf`);
   };
-
-
-  /* =====================================================
-     CHANNEL ITEM
-     ===================================================== */
-
-  const ReportChannel = ({
-    name,
-    value
-  }) => {
-
-    const percentage =
-      grossSales > 0
-        ? (
-            Number(
-              value || 0
-            ) /
-            grossSales
-          ) *
-          100
-        : 0;
-
-
-    return (
-      <div className="report-channel-item">
-
-        <div className="report-channel-top">
-
-          <div className="report-channel-label">
-
-            <span className="report-channel-dot" />
-
-            <span>
-              {name}
-            </span>
-
-          </div>
-
-
-          <strong>
-            {money(value)}
-          </strong>
-
-        </div>
-
-
-        <div className="report-channel-track">
-
-          <span
-            className="report-channel-progress"
-            style={{
-              width:
-                `${Math.min(
-                  100,
-                  percentage
-                )}%`
-            }}
-          />
-
-        </div>
-
-
-        <small>
-          {percentage.toFixed(1)}%
-        </small>
-
-      </div>
-    );
-  };
-
-
-  /* =====================================================
-     PAGE
-     ===================================================== */
 
   return (
     <>
-
       <PageHeader
-        eyebrow="LAPORAN MANAJEMEN"
-        title="Laporan"
-        subtitle="Ringkasan kinerja bisnis berdasarkan periode."
+        eyebrow="PUSAT LAPORAN RESMI"
+        title="Laporan Keuangan & Manajemen"
+        subtitle="Rekapitulasi berkala pendapatan bersih, biaya usaha, dan laba rugi untuk evaluasi bisnis."
         action={
-          <div
-            className="report-header-actions"
-            style={{
-              position:
-                'relative',
-            }}
-          >
-
-            <RangeSelect
-              value={range}
-              onChange={setRange}
-            />
-
-
-            <div
-              className="report-export-group"
-              ref={exportMenuRef}
-              style={{
-                position:
-                  'relative',
-
-                zIndex:
-                  1001
-              }}
-            >
-
+          <div className="report-header-actions">
+            <RangeSelect value={range} onChange={setRange} />
+            <div className="export-menu" ref={exportMenuRef}>
               <button
                 type="button"
-                className="secondary-btn report-export-trigger"
-                onPointerDown={(event) => {
-                  event.stopPropagation();
-                }}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-
-                  setExportOpen(
-                    (prev) =>
-                      !prev
-                  );
-                }}
+                className="secondary-btn"
+                onClick={() => setExportOpen(!exportOpen)}
               >
-
-                <FileText
-                  size={16}
-                />
-
-                <span>
-                  Export
-                </span>
-
-                <ChevronDown
-                  size={15}
-                />
-
+                <Download size={15} />
+                <span>Export Dokumen</span>
+                <ChevronDown size={14} />
               </button>
 
-
               {exportOpen && (
-
-                <div
-                  className="report-export-dropdown"
-                  onPointerDown={(event) => {
-                    event.stopPropagation();
-                  }}
-                  onMouseDown={(event) => {
-                    event.stopPropagation();
-                  }}
-                  style={{
-                    position:
-                      'absolute',
-
-                    top:
-                      'calc(100% + 8px)',
-
-                    right:
-                      0,
-
-                    zIndex:
-                      99999,
-
-                    pointerEvents:
-                      'auto'
-                  }}
-                >
-
-                  {/* CSV */}
-
+                <div className="export-dropdown">
                   <button
                     type="button"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      exportCSV();
-
-                      setExportOpen(
-                        false
-                      );
-                    }}
-                  >
-
-                    <FileText
-                      size={15}
-                    />
-
-                    <span>
-                      Export CSV
-                    </span>
-
-                  </button>
-
-
-                  {/* EXCEL */}
-
-                  <button
-                    type="button"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
+                    onClick={() => {
                       exportExcel();
-
-                      setExportOpen(
-                        false
-                      );
+                      setExportOpen(false);
                     }}
                   >
-
-                    <FileSpreadsheet
-                      size={15}
-                    />
-
-                    <span>
-                      Export Excel
-                    </span>
-
+                    <FileSpreadsheet size={15} />
+                    <span>Microsoft Excel (.xlsx)</span>
                   </button>
-
-
-                  {/* PDF */}
-
                   <button
                     type="button"
-                    onPointerDown={(event) => {
-                      event.stopPropagation();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-
-                      exportPDF();
-
-                      setExportOpen(
-                        false
-                      );
+                    onClick={() => {
+                      exportCSV();
+                      setExportOpen(false);
                     }}
                   >
-
-                    <FileText
-                      size={15}
-                    />
-
-                    <span>
-                      Export PDF
-                    </span>
-
+                    <FileText size={15} />
+                    <span>Comma Separated (.csv)</span>
                   </button>
-
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportPDF();
+                      setExportOpen(false);
+                    }}
+                  >
+                    <FileText size={15} />
+                    <span>Dokumen PDF (.pdf)</span>
+                  </button>
                 </div>
-
               )}
-
             </div>
-
           </div>
         }
       />
 
-
-      <div className="report-page">
-
-
-        {/* =================================================
-            TAB
-            ================================================= */}
-
-        <div className="report-tabs">
-
-          <button
-            type="button"
-            className={
-              activeReport ===
-              'ringkasan'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setActiveReport(
-                'ringkasan'
-              )
-            }
-          >
-            Ringkasan
-          </button>
-
-
-          <button
-            type="button"
-            className={
-              activeReport ===
-              'penjualan'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setActiveReport(
-                'penjualan'
-              )
-            }
-          >
-            Penjualan
-          </button>
-
-
-          <button
-            type="button"
-            className={
-              activeReport ===
-              'laba'
-                ? 'active'
-                : ''
-            }
-            onClick={() =>
-              setActiveReport(
-                'laba'
-              )
-            }
-          >
-            Laba & Rugi
-          </button>
-
-        </div>
-
-
-        {/* =================================================
-            RINGKASAN
-            ================================================= */}
-
-        {activeReport ===
-          'ringkasan' && (
-
-          <div className="report-summary">
-
-
-            {/* =================================================
-                HERO
-                ================================================= */}
-
-            <section className="report-main-kpi">
-
-              <div className="report-net-sales">
-
-                <div className="report-kpi-label">
-                  PENJUALAN BERSIH
-                </div>
-
-                <div className="report-net-sales-value">
-                  {money(netSales)}
-                </div>
-
-                <div className="report-kpi-description">
-                  Pendapatan setelah potongan platform
-                </div>
-
-              </div>
-
-
-              <div className="report-profit-highlight">
-
-                <div className="report-kpi-label">
-                  LABA BERSIH
-                </div>
-
-                <strong>
-                  {money(netProfit)}
-                </strong>
-
-                <span>
-                  Margin {profitMargin.toFixed(1)}%
-                </span>
-
-              </div>
-
-            </section>
-
-
-            {/* =================================================
-                METRIC
-                ================================================= */}
-
-            <section className="report-metric-grid">
-
-              <div className="report-metric-card">
-
-                <span>
-                  Penjualan Kotor
-                </span>
-
-                <strong>
-                  {money(grossSales)}
-                </strong>
-
-              </div>
-
-
-              <div className="report-metric-card">
-
-                <span>
-                  Potongan Platform
-                </span>
-
-                <strong>
-                  {money(platformDeduction)}
-                </strong>
-
-              </div>
-
-
-              <div className="report-metric-card">
-
-                <span>
-                  Pengeluaran
-                </span>
-
-                <strong>
-                  {money(expenseTotal)}
-                </strong>
-
-              </div>
-
-
-              <div className="report-metric-card">
-
-                <span>
-                  Margin Laba
-                </span>
-
-                <strong>
-                  {profitMargin.toFixed(1)}%
-                </strong>
-
-              </div>
-
-            </section>
-
-
-            {/* =================================================
-                TREND + CHANNEL
-                ================================================= */}
-
-            <section className="report-analysis-grid">
-
-
-              {/* TREND */}
-
-              <div className="report-card report-trend-card">
-
-                <div className="report-card-header">
-
-                  <div>
-
-                    <span>
-                      PERFORMA PENJUALAN
-                    </span>
-
-                    <h3>
-                      Tren penjualan
-                    </h3>
-
-                    <p>
-                      Pergerakan omzet berdasarkan transaksi.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                {trend.length > 0 ? (
-
-                  <div className="report-trend-chart">
-
-                    <div className="report-trend-bars">
-
-                      {trend.map(
-                        (
-                          [date, value],
-                          index
-                        ) => {
-
-                          const percentage =
-                            (
-                              Number(value) /
-                              maxTrend
-                            ) *
-                            100;
-
-
-                          return (
-                            <div
-                              key={
-                                `${date}-${index}`
-                              }
-                              className="report-trend-column"
-                            >
-
-                              <div
-                                className="report-trend-value"
-                              >
-                                {money(value)}
-                              </div>
-
-
-                              <div className="report-trend-bar-wrap">
-
-                                <div
-                                  className="report-trend-bar"
-                                  style={{
-                                    height:
-                                      `${Math.max(
-                                        8,
-                                        percentage
-                                      )}%`
-                                  }}
-                                />
-
-                              </div>
-
-
-                              <small>
-                                {formatTrendDate(
-                                  date
-                                )}
-                              </small>
-
-                            </div>
-                          );
-                        }
-                      )}
-
-                    </div>
-
-                  </div>
-
-                ) : (
-
-                  <div className="report-empty">
-                    Belum ada data penjualan pada periode ini.
-                  </div>
-
-                )}
-
-              </div>
-
-
-              {/* CHANNEL */}
-
-              <div className="report-card">
-
-                <div className="report-card-header">
-
-                  <div>
-
-                    <span>
-                      PERFORMA CHANNEL
-                    </span>
-
-                    <h3>
-                      Sumber penjualan
-                    </h3>
-
-                    <p>
-                      Kontribusi setiap channel terhadap omzet.
-                    </p>
-
-                  </div>
-
-                </div>
-
-
-                <div className="report-channel-list">
-
-                  <ReportChannel
-                    name="Website"
-                    value={
-                      channelTotals.website
-                    }
-                  />
-
-
-                  <ReportChannel
-                    name="ShopeeFood"
-                    value={
-                      channelTotals.shopeefood
-                    }
-                  />
-
-
-                  <ReportChannel
-                    name="Offline"
-                    value={
-                      channelTotals.offline
-                    }
-                  />
-
-                </div>
-
-
-                <div className="report-small-highlight">
-
-                  <span>
-                    Channel terbesar
-                  </span>
-
-                  <strong>
-                    {largestChannel}
-                  </strong>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            {/* =================================================
-                OPERASIONAL
-                ================================================= */}
-
-            <section className="report-card">
-
-              <div className="report-card-header">
-
-                <div>
-
-                  <span>
-                    OPERASIONAL
-                  </span>
-
-                  <h3>
-                    Indikator bisnis
-                  </h3>
-
-                  <p>
-                    Ringkasan aktivitas usaha selama periode terpilih.
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="report-operation-grid">
-
-                <div className="report-operation-item">
-
-                  <span>
-                    Total transaksi
-                  </span>
-
-                  <strong>
-                    {transactionCount}
-                  </strong>
-
-                  <small>
-                    transaksi selesai
-                  </small>
-
-                </div>
-
-
-                <div className="report-operation-item">
-
-                  <span>
-                    Rata-rata transaksi
-                  </span>
-
-                  <strong>
-                    {money(
-                      averageTransaction
-                    )}
-                  </strong>
-
-                  <small>
-                    nilai rata-rata
-                  </small>
-
-                </div>
-
-
-                <div className="report-operation-item">
-
-                  <span>
-                    Produk terjual
-                  </span>
-
-                  <strong>
-                    {totalProductsSold}
-                  </strong>
-
-                  <small>
-                    item
-                  </small>
-
-                </div>
-
-
-                <div className="report-operation-item">
-
-                  <span>
-                    Channel terbesar
-                  </span>
-
-                  <strong>
-                    {largestChannel}
-                  </strong>
-
-                  <small>
-                    kontributor omzet
-                  </small>
-
-                </div>
-
-
-                <div className="report-operation-item">
-
-                  <span>
-                    Produk terlaris
-                  </span>
-
-                  <strong
-                    title={
-                      bestProductName
-                    }
-                  >
-                    {bestProductName}
-                  </strong>
-
-                  <small>
-                    produk dengan penjualan tertinggi
-                  </small>
-
-                </div>
-
-
-                <div className="report-operation-item featured">
-
-                  <span>
-                    Margin laba bersih
-                  </span>
-
-                  <strong>
-                    {profitMargin.toFixed(1)}%
-                  </strong>
-
-                  <small>
-                    dari penjualan kotor
-                  </small>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            {/* =================================================
-                INSIGHT
-                ================================================= */}
-
-            <section className="report-insight-grid">
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  PRODUK TERLARIS
-                </div>
-
-                <h3>
-                  {bestProductName}
-                </h3>
-
-                <p>
-                  {bestProduct
-                    ? `${Number(
-                        bestProduct.quantity || 0
-                      )} item terjual pada periode ini.`
-                    : 'Belum tersedia data produk.'}
-                </p>
-
-              </div>
-
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  CATATAN KEUANGAN
-                </div>
-
-                <h3>
-                  Kenali selisih omzet
-                </h3>
-
-                <p>
-                  Penjualan kotor sebesar{' '}
-                  <strong>
-                    {money(grossSales)}
-                  </strong>
-                  {' '}menjadi{' '}
-                  <strong>
-                    {money(netSales)}
-                  </strong>
-                  {' '}setelah potongan platform.
-                </p>
-
-              </div>
-
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  HASIL USAHA
-                </div>
-
-                <h3>
-                  Laba bersih
-                </h3>
-
-                <p>
-                  Setelah memperhitungkan
-                  pengeluaran usaha, laba bersih
-                  tercatat sebesar{' '}
-                  <strong>
-                    {money(netProfit)}
-                  </strong>.
-                </p>
-
-              </div>
-
-            </section>
-
-          </div>
-        )}
-
-
-        {/* =================================================
-            PENJUALAN
-            ================================================= */}
-
-        {activeReport ===
-          'penjualan' && (
-
-          <div className="report-summary">
-
-            <section className="report-card">
-
-              <div className="report-card-header">
-
-                <div>
-
-                  <span>
-                    LAPORAN PENJUALAN
-                  </span>
-
-                  <h3>
-                    Rekap transaksi
-                  </h3>
-
-                  <p>
-                    Daftar transaksi yang selesai pada periode terpilih.
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="report-sales-summary">
-
-                <div>
-
-                  <span>
-                    Penjualan kotor
-                  </span>
-
-                  <strong>
-                    {money(grossSales)}
-                  </strong>
-
-                </div>
-
-
-                <div>
-
-                  <span>
-                    Penjualan bersih
-                  </span>
-
-                  <strong>
-                    {money(netSales)}
-                  </strong>
-
-                </div>
-
-
-                <div>
-
-                  <span>
-                    Total transaksi
-                  </span>
-
-                  <strong>
-                    {transactionCount}
-                  </strong>
-
-                </div>
-
-
-                <div>
-
-                  <span>
-                    Rata-rata
-                  </span>
-
-                  <strong>
-                    {money(
-                      averageTransaction
-                    )}
-                  </strong>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            <section className="report-card">
-
-              <div className="report-card-header">
-
-                <div>
-
-                  <span>
-                    DETAIL TRANSAKSI
-                  </span>
-
-                  <h3>
-                    Penjualan selesai
-                  </h3>
-
-                  <p>
-                    Gunakan tabel ini untuk melihat transaksi individual.
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="table-panel report-table-panel">
-
-                <div className="table-scroll">
-
-                  <table>
-
-                    <thead>
-
-                      <tr>
-
-                        <th>
-                          Kode
-                        </th>
-
-                        <th>
-                          Tanggal
-                        </th>
-
-                        <th>
-                          Channel
-                        </th>
-
-                        <th>
-                          Status
-                        </th>
-
-                        <th className="right">
-                          Total
-                        </th>
-
-                      </tr>
-
-                    </thead>
-
-
-                    <tbody>
-
-                      {rows.map(
-                        (row) => (
-
-                          <tr
-                            key={
-                              `${row.orderCode}-${row.orderedAt}`
-                            }
-                          >
-
-                            <td>
-                              <strong>
-                                {row.orderCode}
-                              </strong>
-                            </td>
-
-
-                            <td>
-
-                              {row.orderedAt
-                                ? new Date(
-                                    row.orderedAt
-                                  ).toLocaleString(
-                                    'id-ID'
-                                  )
-                                : '-'}
-
-                            </td>
-
-
-                            <td>
-
-                              <ChannelBadge
-                                channel={
-                                  row.channel
-                                }
-                              />
-
-                            </td>
-
-
-                            <td>
-
-                              <span className="status-badge done">
-                                Selesai
-                              </span>
-
-                            </td>
-
-
-                            <td className="right">
-
-                              <strong>
-                                {money(
-                                  row.total
-                                )}
-                              </strong>
-
-                            </td>
-
-                          </tr>
-
-                        )
-                      )}
-
-
-                      {!rows.length && (
-
-                        <tr>
-
-                          <td
-                            colSpan="5"
-                            className="empty-cell"
-                          >
-                            Belum ada transaksi
-                            pada periode ini.
-                          </td>
-
-                        </tr>
-
-                      )}
-
-                    </tbody>
-
-                  </table>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            <section className="report-card">
-
-              <div className="report-card-header">
-
-                <div>
-
-                  <span>
-                    PRODUK
-                  </span>
-
-                  <h3>
-                    Produk terlaris
-                  </h3>
-
-                </div>
-
-              </div>
-
-
-              <div className="report-product-list">
-
-                {products.length > 0 ? (
-
-                  products
-                    .slice(0, 8)
-                    .map(
-                      (
-                        product,
-                        index
-                      ) => (
-
-                        <div
-                          className="report-product-item"
-                          key={
-                            product.menuId ||
-                            `${product.name}-${index}`
-                          }
-                        >
-
-                          <div className="report-product-rank">
-                            {String(
-                              index + 1
-                            ).padStart(
-                              2,
-                              '0'
-                            )}
-                          </div>
-
-
-                          <div>
-
-                            <strong>
-                              {product.name}
-                            </strong>
-
-                            <span>
-                              {Number(
-                                product.quantity || 0
-                              )}{' '}
-                              item terjual
-                            </span>
-
-                          </div>
-
-
-                          <strong>
-                            {money(
-                              product.revenue || 0
-                            )}
-                          </strong>
-
-                        </div>
-
-                      )
-                    )
-
-                ) : (
-
-                  <div className="report-empty">
-                    Belum ada data produk.
-                  </div>
-
-                )}
-
-              </div>
-
-            </section>
-
-          </div>
-        )}
-
-
-        {/* =================================================
-            LABA RUGI
-            ================================================= */}
-
-        {activeReport ===
-          'laba' && (
-
-          <div className="report-summary">
-
-
-            <section className="report-profit-hero">
-
-              <div>
-
-                <span>
-                  LABA BERSIH
-                </span>
-
-                <strong>
-                  {money(netProfit)}
-                </strong>
-
-                <p>
-                  Margin laba bersih{' '}
-                  {profitMargin.toFixed(1)}%
-                </p>
-
-              </div>
-
-
-              <div className="report-profit-side">
-
-                <div>
-
-                  <span>
-                    Penjualan Bersih
-                  </span>
-
-                  <strong>
-                    {money(netSales)}
-                  </strong>
-
-                </div>
-
-
-                <div>
-
-                  <span>
-                    Pengeluaran
-                  </span>
-
-                  <strong>
-                    {money(expenseTotal)}
-                  </strong>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            <section className="report-card">
-
-              <div className="report-card-header">
-
-                <div>
-
-                  <span>
-                    LABA RUGI
-                  </span>
-
-                  <h3>
-                    Perhitungan laba bersih
-                  </h3>
-
-                  <p>
-                    Komponen pendapatan dan biaya usaha.
-                  </p>
-
-                </div>
-
-              </div>
-
-
-              <div className="report-profit-list">
-
-                <div className="report-profit-row">
-
-                  <span>
-                    Penjualan Kotor
-                  </span>
-
-                  <strong>
-                    {money(
-                      grossSales
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="report-profit-row deduction">
-
-                  <span>
-                    Potongan Platform
-                  </span>
-
-                  <strong>
-                    - {money(
-                      platformDeduction
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="report-profit-row subtotal">
-
-                  <span>
-                    Penjualan Bersih
-                  </span>
-
-                  <strong>
-                    {money(
-                      netSales
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="report-profit-row deduction">
-
-                  <span>
-                    Pengeluaran
-                  </span>
-
-                  <strong>
-                    - {money(
-                      expenseTotal
-                    )}
-                  </strong>
-
-                </div>
-
-
-                <div className="report-profit-row final">
-
-                  <span>
-                    Laba Bersih
-                  </span>
-
-                  <strong>
-                    {money(
-                      netProfit
-                    )}
-                  </strong>
-
-                </div>
-
-              </div>
-
-            </section>
-
-
-            <section className="report-insight-grid">
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  MARGIN LABA
-                </div>
-
-                <h3>
-                  {profitMargin.toFixed(1)}%
-                </h3>
-
-                <p>
-                  Persentase laba bersih dibanding penjualan kotor.
-                </p>
-
-              </div>
-
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  POTONGAN PLATFORM
-                </div>
-
-                <h3>
-                  {money(
-                    platformDeduction
-                  )}
-                </h3>
-
-                <p>
-                  Potongan platform yang memengaruhi penjualan bersih.
-                </p>
-
-              </div>
-
-
-              <div className="report-insight-card">
-
-                <div className="report-insight-badge">
-                  PENGELUARAN
-                </div>
-
-                <h3>
-                  {money(
-                    expenseTotal
-                  )}
-                </h3>
-
-                <p>
-                  Total biaya usaha yang diperhitungkan dalam laporan.
-                </p>
-
-              </div>
-
-            </section>
-
-          </div>
-        )}
-
+      {/* REPORT TABS */}
+      <div className="report-tabs">
+        <button
+          type="button"
+          className={activeReport === 'ringkasan' ? 'active' : ''}
+          onClick={() => setActiveReport('ringkasan')}
+        >
+          Ringkasan Eksekutif
+        </button>
+        <button
+          type="button"
+          className={activeReport === 'penjualan' ? 'active' : ''}
+          onClick={() => setActiveReport('penjualan')}
+        >
+          Rekapitulasi Penjualan
+        </button>
+        <button
+          type="button"
+          className={activeReport === 'laba' ? 'active' : ''}
+          onClick={() => setActiveReport('laba')}
+        >
+          Laporan Laba & Rugi (P&L)
+        </button>
       </div>
+
+      {/* 1. RINGKASAN TAB */}
+      {activeReport === 'ringkasan' && (
+        <div className="report-content-flow">
+          <div className="report-hero-kpi">
+            <div className="hero-kpi-main">
+              <span className="hero-kpi-badge">NET OPERATING PROFIT</span>
+              <div className="hero-kpi-amount">{money(netProfit)}</div>
+              <p>Laba bersih yang berhasil dibukukan setelah dikurangi seluruh biaya operasional & komisi platform.</p>
+            </div>
+            <div className="hero-kpi-subcards">
+              <div className="hero-subcard">
+                <span>Margin Laba Bersih</span>
+                <strong>{profitMargin.toFixed(1)}%</strong>
+              </div>
+              <div className="hero-subcard">
+                <span>Rata-rata Nilai Pesanan</span>
+                <strong>{money(averageTransaction)}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div className="report-financial-grid">
+            <div className="report-financial-card">
+              <span>PENJUALAN KOTOR</span>
+              <strong>{money(grossSales)}</strong>
+            </div>
+            <div className="report-financial-card">
+              <span>POTONGAN SHOPEEFOOD</span>
+              <strong>- {money(platformDeduction)}</strong>
+            </div>
+            <div className="report-financial-card dark">
+              <span>PENJUALAN BERSIH</span>
+              <strong>{money(netSales)}</strong>
+            </div>
+            <div className="report-financial-card">
+              <span>PENGELUARAN (OPEX)</span>
+              <strong>- {money(expenseTotal)}</strong>
+            </div>
+            <div className="report-financial-card profit">
+              <span>LABA BERSIH (EBIT)</span>
+              <strong>{money(netProfit)}</strong>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. REKAP PENJUALAN TAB */}
+      {activeReport === 'penjualan' && (
+        <div className="report-content-flow">
+          <div className="table-panel">
+            <div className="table-head">
+              <strong>Rekapitulasi Transaksi Selesai</strong>
+              <span>Daftar seluruh pesanan pelanggan yang tercatat dalam periode laporan</span>
+            </div>
+            <div className="table-scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Kode Pesanan</th>
+                    <th>Waktu Pesanan</th>
+                    <th>Channel</th>
+                    <th>Status</th>
+                    <th className="right">Nominal</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={`${row.orderCode}-${row.orderedAt}`}>
+                      <td>
+                        <strong className="order-code-badge">{row.orderCode}</strong>
+                      </td>
+                      <td>{formatDateTime(row.orderedAt)}</td>
+                      <td>
+                        <ChannelBadge channel={row.channel} />
+                      </td>
+                      <td>
+                        <span className="status-badge done">Lunas</span>
+                      </td>
+                      <td className="right">
+                        <strong>{money(row.total)}</strong>
+                      </td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && (
+                    <tr>
+                      <td colSpan="5" className="empty-cell">
+                        Belum ada transaksi pada periode ini.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. LABA & RUGI (INCOME STATEMENT) TAB */}
+      {activeReport === 'laba' && (
+        <div className="report-content-flow">
+          <div className="income-statement-card">
+            <div className="statement-head">
+              <h3>Laporan Laba & Rugi (Income Statement)</h3>
+              <span>Dapoersari Food & Beverages • Periode: {range}</span>
+            </div>
+
+            <div className="statement-table">
+              <div className="statement-row header-row">
+                <span>Komponen Keuangan</span>
+                <span className="right">Jumlah (IDR)</span>
+              </div>
+
+              <div className="statement-row">
+                <div className="statement-label">
+                  <strong>1. Pendapatan Penjualan Kotor (Gross Revenue)</strong>
+                  <small>Total omzet seluruh transaksi kasir & online</small>
+                </div>
+                <strong className="right">{money(grossSales)}</strong>
+              </div>
+
+              <div className="statement-row deduction">
+                <div className="statement-label indent">
+                  <span>(-) Potongan & Komisi Platform ShopeeFood</span>
+                  <small>Biaya komisi layanan 25%</small>
+                </div>
+                <span className="right deduction-text">- {money(platformDeduction)}</span>
+              </div>
+
+              <div className="statement-row subtotal-row">
+                <strong>2. Pendapatan Penjualan Bersih (Net Revenue)</strong>
+                <strong className="right">{money(netSales)}</strong>
+              </div>
+
+              <div className="statement-row deduction">
+                <div className="statement-label indent">
+                  <span>(-) Beban Pengeluaran Operasional (OpEx)</span>
+                  <small>Belanja bahan baku, utilitas, listrik & logistik</small>
+                </div>
+                <span className="right deduction-text">- {money(expenseTotal)}</span>
+              </div>
+
+              <div className="statement-row final-row">
+                <div>
+                  <strong>LABA BERSIH USAHA (NET OPERATING PROFIT)</strong>
+                  <small>Margin Profitabilitas: {profitMargin.toFixed(1)}%</small>
+                </div>
+                <strong className="right profit-amount">{money(netProfit)}</strong>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
 
-
 /* =========================================================
-   PANEL
+   7. SETTINGS COMPONENT (PENGATURAN)
    ========================================================= */
+function SettingsPage() {
+  const [activeSection, setActiveSection] = useState(null);
+  const [settings, setSettings] = useState({
+    businessName: 'Dapoersari',
+    businessDescription: '',
+    phone: '',
+    address: '',
+    openingHours: '',
+    shopeefoodPlatformRate: 25,
+    targetDailySales: 0,
+    targetMonthlySales: 0,
+    targetDailyTransactions: 0,
+    targetMargin: 0
+  });
 
-function Panel({
-  title,
-  hint,
-  children
-}) {
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [categoryLoading, setCategoryLoading] = useState(false);
+  const [categoryModal, setCategoryModal] = useState(false);
+  const [categoryForm, setCategoryForm] = useState({ id: null, name: '' });
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  const [passwordModal, setPasswordModal] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  const changePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+
+    if (passwordForm.currentPassword.length === 0) {
+      setPasswordError('Password saat ini wajib diisi.');
+      return;
+    }
+    if (passwordForm.newPassword.length < 6) {
+      setPasswordError('Password baru minimal 6 karakter.');
+      return;
+    }
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('Konfirmasi password tidak cocok.');
+      return;
+    }
+    if (passwordForm.currentPassword === passwordForm.newPassword) {
+      setPasswordError('Password baru harus berbeda dari password lama.');
+      return;
+    }
+
+    try {
+      setPasswordSaving(true);
+      await api.post('/auth/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setPasswordModal(false);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Password berhasil diperbarui dengan aman.');
+    } catch (err) {
+      console.error('Gagal mengubah password:', err);
+      setPasswordError(err?.response?.data?.error || 'Password gagal diubah.');
+    } finally {
+      setPasswordSaving(false);
+    }
+  };
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const response = await api.get('/settings');
+      const data = response.data || {};
+      setSettings({
+        businessName: data.businessName || data.business_name || 'Dapoersari',
+        businessDescription: data.businessDescription || data.business_description || '',
+        phone: data.phone || '',
+        address: data.address || '',
+        openingHours: data.openingHours || data.opening_hours || '',
+        shopeefoodPlatformRate: Number(
+          data.shopeefoodPlatformRate ?? data.platformFee ?? data.shopeefood_platform_rate ?? 25
+        ),
+        targetDailySales: Number(data.targetDailySales ?? data.dailyTarget ?? data.target_daily_sales ?? 0),
+        targetMonthlySales: Number(data.targetMonthlySales ?? data.monthlyTarget ?? data.target_monthly_sales ?? 0),
+        targetDailyTransactions: Number(data.targetDailyTransactions ?? data.target_daily_transactions ?? 0),
+        targetMargin: Number(data.targetMargin ?? data.target_margin ?? 0)
+      });
+    } catch (e) {
+      console.error('Gagal memuat pengaturan:', e);
+      setError(e?.response?.data?.error || '');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      setCategoryLoading(true);
+      const response = await api.get('/expense-categories');
+      const data = Array.isArray(response.data) ? response.data : response.data?.data || [];
+      setCategories(data);
+    } catch (e) {
+      console.error('Kategori gagal dimuat:', e);
+      setCategories([]);
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+    loadCategories();
+  }, []);
+
+  const updateField = (field, value) => {
+    setSettings((current) => ({ ...current, [field]: value }));
+    setMessage('');
+  };
+
+  const saveSettings = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      setMessage('');
+      setError('');
+      await api.put('/settings', {
+        businessName: settings.businessName,
+        businessDescription: settings.businessDescription,
+        phone: settings.phone,
+        address: settings.address,
+        openingHours: settings.openingHours,
+        shopeefoodPlatformRate: Number(settings.shopeefoodPlatformRate),
+        targetDailySales: Number(settings.targetDailySales),
+        targetMonthlySales: Number(settings.targetMonthlySales),
+        targetDailyTransactions: Number(settings.targetDailyTransactions),
+        targetMargin: Number(settings.targetMargin)
+      });
+      setMessage('Konfigurasi pengaturan berhasil disimpan.');
+    } catch (e) {
+      console.error('Gagal menyimpan:', e);
+      setError(e?.response?.data?.error || 'Pengaturan gagal disimpan.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const openAddCategory = () => {
+    setCategoryForm({ id: null, name: '' });
+    setCategoryModal(true);
+  };
+
+  const openEditCategory = (category) => {
+    setCategoryForm({ id: category.id, name: category.name || '' });
+    setCategoryModal(true);
+  };
+
+  const saveCategory = async (e) => {
+    e.preventDefault();
+    const name = categoryForm.name.trim();
+    if (!name) {
+      alert('Nama kategori wajib diisi.');
+      return;
+    }
+
+    try {
+      setCategoryLoading(true);
+      if (categoryForm.id) {
+        await api.put(`/expense-categories/${categoryForm.id}`, { name });
+      } else {
+        await api.post('/expense-categories', { name });
+      }
+      setCategoryModal(false);
+      await loadCategories();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Kategori gagal disimpan.');
+    } finally {
+      setCategoryLoading(false);
+    }
+  };
+
+  const deleteCategory = async (id) => {
+    const confirmed = window.confirm('Hapus kategori ini dari sistem?');
+    if (!confirmed) return;
+    try {
+      await api.delete(`/expense-categories/${id}`);
+      await loadCategories();
+    } catch (e) {
+      alert(e?.response?.data?.error || 'Kategori gagal dihapus.');
+    }
+  };
+
+  if (loading) return <LoadingPage />;
+
+  const settingMenus = [
+    {
+      id: 'usaha',
+      title: 'Profil & Identitas Usaha',
+      description: 'Nama bisnis, kontak resmi, alamat restoran, dan jam operasional.',
+      icon: <Store size={20} />
+    },
+    {
+      id: 'penjualan',
+      title: 'Konfigurasi Channel & Komisi',
+      description: 'Atur potongan komisi platform ShopeeFood & status channel penjualan.',
+      icon: <Receipt size={20} />
+    },
+    {
+      id: 'target',
+      title: 'Target Bisnis & Margin KPI',
+      description: 'Tentukan target omzet harian, bulanan, dan batas target margin keuntungan.',
+      icon: <Target size={20} />
+    },
+    {
+      id: 'kategori',
+      title: 'Kategori Pengeluaran (OpEx)',
+      description: 'Kelola klasifikasi pos biaya operasional agar pencatatan lebih teratur.',
+      icon: <WalletCards size={20} />
+    },
+    {
+      id: 'akun',
+      title: 'Akun Owner & Keamanan',
+      description: 'Kelola profil eksekutif owner dan perbarui kata sandi akses portal.',
+      icon: <ShieldCheck size={20} />
+    }
+  ];
 
   return (
-    <section
-      className="
-        panel
-      "
-    >
-
-      <div
-        className="
-          panel-head
-        "
-      >
-
-        <div>
-
-          <strong>
-            {title}
-          </strong>
-
-          <span>
-            {hint}
-          </span>
-
-        </div>
-
-      </div>
-
-
-      {children}
-
-    </section>
-  );
-}
-
-
-/* =========================================================
-   LOADING
-   ========================================================= */
-
-function LoadingPage() {
-
-  return (
-    <div
-      className="
-        loading-page
-      "
-    >
-
-      <div
-        className="
-          spinner
-        "
+    <>
+      <PageHeader
+        eyebrow="PUSAT KONTROL"
+        title="Pengaturan Sistem"
+        subtitle="Kelola konfigurasi bisnis, parameter perhitungan keuangan, target penjualan, dan keamanan akun."
       />
 
-      <span>
-        Menyiapkan data...
-      </span>
+      <div className="settings-shell">
+        {/* SETTINGS MENU HUB */}
+        {!activeSection && (
+          <section className="settings-home">
+            <div className="settings-menu-list">
+              {settingMenus.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="settings-menu-card"
+                  onClick={() => setActiveSection(item.id)}
+                >
+                  <div className="settings-menu-icon">{item.icon}</div>
+                  <div className="settings-menu-copy">
+                    <strong>{item.title}</strong>
+                    <span>{item.description}</span>
+                  </div>
+                  <ChevronRight size={18} className="settings-menu-arrow" />
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
-    </div>
-  );
-}
+        {/* SETTINGS DETAIL PANELS */}
+        {activeSection && (
+          <section className="settings-detail">
+            <button type="button" className="settings-back" onClick={() => setActiveSection(null)}>
+              <ArrowLeft size={16} />
+              <span>Kembali ke Menu Pengaturan</span>
+            </button>
 
+            {/* 1. PROFIL USAHA */}
+            {activeSection === 'usaha' && (
+              <form className="settings-detail-card" onSubmit={saveSettings}>
+                <div className="settings-detail-head">
+                  <div className="settings-detail-icon">
+                    <Store size={20} />
+                  </div>
+                  <div>
+                    <span>IDENTITAS BISNIS</span>
+                    <h2>Profil Restoran / Usaha</h2>
+                    <p>Informasi identitas restoran yang digunakan dalam laporan resmi.</p>
+                  </div>
+                </div>
 
-/* =========================================================
-   ERROR
-   ========================================================= */
+                <div className="settings-form">
+                  <div className="settings-field">
+                    <label>Nama Usaha / Restoran</label>
+                    <input
+                      value={settings.businessName}
+                      onChange={(e) => updateField('businessName', e.target.value)}
+                      required
+                    />
+                  </div>
 
-function ErrorState({
-  message
-}) {
+                  <div className="settings-field">
+                    <label>Nomor Telepon / WhatsApp</label>
+                    <input
+                      value={settings.phone}
+                      onChange={(e) => updateField('phone', e.target.value)}
+                      placeholder="081234567890"
+                    />
+                  </div>
 
-  return (
-    <div
-      className="
-        error-page
-      "
-    >
+                  <div className="settings-field settings-field-full">
+                    <label>Deskripsi Singkat Usaha</label>
+                    <textarea
+                      value={settings.businessDescription}
+                      onChange={(e) => updateField('businessDescription', e.target.value)}
+                      placeholder="Spesialis kuliner tradisional & catering modern"
+                    />
+                  </div>
 
-      <div
-        className="
-          error-icon
-        "
-      >
-        !
+                  <div className="settings-field settings-field-full">
+                    <label>Alamat Lengkap</label>
+                    <textarea
+                      value={settings.address}
+                      onChange={(e) => updateField('address', e.target.value)}
+                      placeholder="Jl. Raya Utama No. 123, Indonesia"
+                    />
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Jam Operasional Toko</label>
+                    <input
+                      value={settings.openingHours}
+                      onChange={(e) => updateField('openingHours', e.target.value)}
+                      placeholder="10.00 - 22.00 WIB"
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-card-foot">
+                  <div>
+                    {message && <span className="settings-success">{message}</span>}
+                    {error && <span className="settings-error">{error}</span>}
+                  </div>
+                  <button type="submit" className="primary-btn" disabled={saving}>
+                    {saving ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* 2. PENJUALAN */}
+            {activeSection === 'penjualan' && (
+              <form className="settings-detail-card" onSubmit={saveSettings}>
+                <div className="settings-detail-head">
+                  <div className="settings-detail-icon">
+                    <Receipt size={20} />
+                  </div>
+                  <div>
+                    <span>CHANNEL PENJUALAN</span>
+                    <h2>Konfigurasi Channel & Komisi</h2>
+                    <p>Atur parameter komisi platform pihak ketiga untuk kalkulasi pendapatan bersih otomatis.</p>
+                  </div>
+                </div>
+
+                <div className="settings-form">
+                  <div className="settings-field">
+                    <label>Potongan Komisi ShopeeFood (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={settings.shopeefoodPlatformRate}
+                      onChange={(e) => updateField('shopeefoodPlatformRate', e.target.value)}
+                    />
+                    <small className="settings-help">Digunakan untuk menghitung omzet bersih secara otomatis.</small>
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Status Channel Penjualan Aktif</label>
+                    <div className="settings-static-box">
+                      <span>Website Pemesanan Online</span>
+                      <b>Terkoneksi & Aktif</b>
+                    </div>
+                    <div className="settings-static-box">
+                      <span>Kasir Offline / Dine-in</span>
+                      <b>Terkoneksi & Aktif</b>
+                    </div>
+                    <div className="settings-static-box">
+                      <span>ShopeeFood Merchant</span>
+                      <b>Terkoneksi & Aktif</b>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-card-foot">
+                  <div>
+                    {message && <span className="settings-success">{message}</span>}
+                    {error && <span className="settings-error">{error}</span>}
+                  </div>
+                  <button type="submit" className="primary-btn" disabled={saving}>
+                    {saving ? 'Menyimpan...' : 'Simpan Konfigurasi'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* 3. TARGET BISNIS */}
+            {activeSection === 'target' && (
+              <form className="settings-detail-card" onSubmit={saveSettings}>
+                <div className="settings-detail-head">
+                  <div className="settings-detail-icon">
+                    <Target size={20} />
+                  </div>
+                  <div>
+                    <span>TARGET & KPI</span>
+                    <h2>Target Omzet & Margin Bisnis</h2>
+                    <p>Sasaran performa toko yang menjadi tolak ukur evaluasi eksekutif.</p>
+                  </div>
+                </div>
+
+                <div className="settings-form">
+                  <div className="settings-field">
+                    <label>Target Omzet Harian (Rp)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.targetDailySales}
+                      onChange={(e) => updateField('targetDailySales', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Target Omzet Bulanan (Rp)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.targetMonthlySales}
+                      onChange={(e) => updateField('targetMonthlySales', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Target Transaksi Harian (Pesanan)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={settings.targetDailyTransactions}
+                      onChange={(e) => updateField('targetDailyTransactions', e.target.value)}
+                    />
+                  </div>
+
+                  <div className="settings-field">
+                    <label>Target Margin Laba Bersih (%)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={settings.targetMargin}
+                      onChange={(e) => updateField('targetMargin', e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="settings-target-preview">
+                  <div>
+                    <span>Target Omzet Harian</span>
+                    <strong>{money(settings.targetDailySales)}</strong>
+                  </div>
+                  <div>
+                    <span>Target Omzet Bulanan</span>
+                    <strong>{money(settings.targetMonthlySales)}</strong>
+                  </div>
+                </div>
+
+                <div className="settings-card-foot">
+                  <div>
+                    {message && <span className="settings-success">{message}</span>}
+                    {error && <span className="settings-error">{error}</span>}
+                  </div>
+                  <button type="submit" className="primary-btn" disabled={saving}>
+                    {saving ? 'Menyimpan...' : 'Simpan Target'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* 4. KATEGORI PENGELUARAN */}
+            {activeSection === 'kategori' && (
+              <div className="settings-detail-card">
+                <div className="settings-detail-head">
+                  <div className="settings-detail-icon">
+                    <WalletCards size={20} />
+                  </div>
+                  <div>
+                    <span>POS BIAYA</span>
+                    <h2>Kategori Pengeluaran (OpEx)</h2>
+                    <p>Kelola klasifikasi biaya operasional agar pencatatan buku kas lebih tertib.</p>
+                  </div>
+                </div>
+
+                <div className="settings-toolbar">
+                  <div>
+                    <strong>{categories.length} Kategori</strong>
+                    <span>terdaftar dalam sistem</span>
+                  </div>
+                  <button type="button" className="primary-btn small" onClick={openAddCategory}>
+                    <Plus size={15} />
+                    <span>Tambah Kategori</span>
+                  </button>
+                </div>
+
+                <div className="category-settings-list">
+                  {categoryLoading ? (
+                    <div className="settings-inline-loading">
+                      <div className="spinner small" />
+                      <span>Memuat data kategori...</span>
+                    </div>
+                  ) : categories.length === 0 ? (
+                    <div className="settings-empty">
+                      <strong>Belum ada kategori pengeluaran</strong>
+                      <span>Tambahkan kategori baru untuk memudahkan pembukuan.</span>
+                    </div>
+                  ) : (
+                    categories.map((cat) => (
+                      <div key={cat.id} className="category-settings-row">
+                        <div className="category-row-left">
+                          <span className="category-dot" />
+                          <strong>{cat.name}</strong>
+                        </div>
+                        <div className="category-actions">
+                          <button
+                            type="button"
+                            className="ghost-icon"
+                            onClick={() => openEditCategory(cat)}
+                            title="Edit nama kategori"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button
+                            type="button"
+                            className="ghost-icon danger"
+                            onClick={() => deleteCategory(cat.id)}
+                            title="Hapus kategori"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5. AKUN & KEAMANAN */}
+            {activeSection === 'akun' && (
+              <div className="settings-stack">
+                <div className="settings-detail-card">
+                  <div className="settings-detail-head">
+                    <div className="settings-detail-icon">
+                      <ShieldCheck size={20} />
+                    </div>
+                    <div>
+                      <span>PROFIL OWNER</span>
+                      <h2>Akun & Hak Akses</h2>
+                      <p>Informasi kredensial eksekutif owner Dapoersari.</p>
+                    </div>
+                  </div>
+
+                  <div className="account-profile">
+                    <div className="account-avatar">L</div>
+                    <div className="account-meta">
+                      <strong>Linda Kumalasari</strong>
+                      <span>Executive Owner • Hak Akses Utama</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="settings-detail-card">
+                  <div className="security-row">
+                    <div>
+                      <strong>Kata Sandi Akses Portal</strong>
+                      <span>Perbarui kata sandi akun secara berkala untuk menjaga keamanan data finansial.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-btn"
+                      onClick={() => {
+                        setPasswordError('');
+                        setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                        setPasswordModal(true);
+                      }}
+                    >
+                      Ubah Kata Sandi
+                    </button>
+                  </div>
+
+                  <div className="security-row">
+                    <div>
+                      <strong>Keluar dari Sesi Portal</strong>
+                      <span>Sesi owner akan ditutup pada peramban ini.</span>
+                    </div>
+                    <button
+                      type="button"
+                      className="secondary-btn danger-btn"
+                      onClick={() => {
+                        if (window.confirm('Keluar dari portal Dapoersari?')) {
+                          localStorage.removeItem('p2_token');
+                          window.location.href = '/login';
+                        }
+                      }}
+                    >
+                      Keluar Sesi
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
       </div>
 
+      {/* PASSWORD MODAL */}
+      {passwordModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !passwordSaving) setPasswordModal(false);
+          }}
+        >
+          <div className="modal-card password-modal" role="dialog" aria-modal="true">
+            <div className="modal-head">
+              <div>
+                <span className="eyebrow">KEAMANAN AKUN</span>
+                <h3>Ubah Kata Sandi</h3>
+              </div>
+              <button
+                type="button"
+                className="ghost-icon"
+                disabled={passwordSaving}
+                onClick={() => setPasswordModal(false)}
+                aria-label="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-      <h2>
-        Data belum bisa dimuat
-      </h2>
+            <form className="password-form" onSubmit={changePassword}>
+              <div className="password-intro">
+                <div className="password-intro-icon">
+                  <Lock size={18} />
+                </div>
+                <div>
+                  <strong>Perbarui Keamanan Akses</strong>
+                  <span>Gunakan kombinasi minimal 6 karakter dengan huruf dan angka.</span>
+                </div>
+              </div>
 
+              <div className="form-group">
+                <label>Kata Sandi Saat Ini</label>
+                <input
+                  type="password"
+                  value={passwordForm.currentPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
+                  placeholder="Masukkan kata sandi saat ini"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
 
-      <p>
-        {message}
-      </p>
+              <div className="form-group">
+                <label>Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  value={passwordForm.newPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
+                  placeholder="Minimal 6 karakter"
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
 
-    </div>
+              <div className="form-group">
+                <label>Konfirmasi Kata Sandi Baru</label>
+                <input
+                  type="password"
+                  value={passwordForm.confirmPassword}
+                  onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
+                  placeholder="Ulangi kata sandi baru"
+                  autoComplete="new-password"
+                  required
+                />
+              </div>
+
+              {passwordError && <div className="error-box">{passwordError}</div>}
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  disabled={passwordSaving}
+                  onClick={() => setPasswordModal(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="primary-btn" disabled={passwordSaving}>
+                  {passwordSaving ? 'Menyimpan...' : 'Simpan Kata Sandi'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* CATEGORY MODAL */}
+      {categoryModal && (
+        <div
+          className="modal-backdrop"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget && !categoryLoading) setCategoryModal(false);
+          }}
+        >
+          <div className="modal-card category-modal">
+            <div className="modal-head">
+              <div>
+                <span className="eyebrow">POS BIAYA</span>
+                <h3>{categoryForm.id ? 'Edit Kategori' : 'Tambah Kategori'}</h3>
+              </div>
+              <button
+                type="button"
+                className="ghost-icon"
+                onClick={() => setCategoryModal(false)}
+                aria-label="Tutup"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form className="settings-modal-form" onSubmit={saveCategory}>
+              <div className="form-group">
+                <label>Nama Kategori</label>
+                <input
+                  type="text"
+                  value={categoryForm.name}
+                  onChange={(e) => setCategoryForm({ ...categoryForm, name: e.target.value })}
+                  placeholder="Contoh: Bahan Baku & Dapur"
+                  autoFocus
+                  required
+                />
+              </div>
+
+              <div className="modal-actions">
+                <button
+                  type="button"
+                  className="secondary-btn"
+                  onClick={() => setCategoryModal(false)}
+                >
+                  Batal
+                </button>
+                <button type="submit" className="primary-btn" disabled={categoryLoading}>
+                  {categoryLoading ? 'Menyimpan...' : 'Simpan Kategori'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
-
 /* =========================================================
-   REACT ROOT
+   REACT ROOT MOUNT
    ========================================================= */
-
-ReactDOM
-  .createRoot(
-    document.getElementById(
-      'root'
-    )
-  )
-  .render(
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  );
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
